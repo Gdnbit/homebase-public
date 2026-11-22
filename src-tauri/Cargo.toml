@@ -78,7 +78,7 @@ regex = "1"
 sysinfo = "0.32"         # 进程列表（Agents 模块）
 futures = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
-dirs = "5"               # S1 · 跨平台 home_dir() · ~/.homebase/shared/context.toml
+dirs = "6"               # S1 · 跨平台 home_dir() · ~/.homebase/shared/context.toml
 
 # Phase E1 · Studio Checkpoint（zip 快照 _raw · 一键撤回 AI 改动）
 zip = { version = "2", default-features = false, features = ["deflate"] }
