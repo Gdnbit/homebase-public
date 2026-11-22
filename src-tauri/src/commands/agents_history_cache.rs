@@ -71,6 +71,7 @@ impl SummaryCache {
             self.bytes -= previous.bytes;
         }
 
+        let cacheable = stamp.as_ref().is_some_and(FileStamp::is_stable);
         let entries = parse(path, &file)?;
         if let Some(stamp) = stamp {
             // Check the named file again so an atomic replacement cannot publish
@@ -84,19 +85,21 @@ impl SummaryCache {
             {
                 return Err(HISTORY_CHANGED.into());
             }
-            let bytes = summary_bytes(path, &entries);
-            if self.files.len() < MAX_CACHED_FILES && bytes <= MAX_CACHE_BYTES - self.bytes {
-                summaries.extend(entries.iter().cloned());
-                self.files.insert(
-                    path.to_owned(),
-                    CachedFile {
-                        stamp,
-                        entries,
-                        bytes,
-                    },
-                );
-                self.bytes += bytes;
-                return Ok(());
+            if cacheable && self.files.len() < MAX_CACHED_FILES {
+                let bytes = summary_bytes(path, &entries);
+                if bytes <= MAX_CACHE_BYTES - self.bytes {
+                    summaries.extend(entries.iter().cloned());
+                    self.files.insert(
+                        path.to_owned(),
+                        CachedFile {
+                            stamp,
+                            entries,
+                            bytes,
+                        },
+                    );
+                    self.bytes += bytes;
+                    return Ok(());
+                }
             }
         }
         summaries.extend(entries);
@@ -156,6 +159,34 @@ struct FileStamp {
     written: i64,
     changed: i64,
     length: u64,
+}
+
+#[cfg(windows)]
+const FILE_TIME_SETTLE: std::time::Duration = std::time::Duration::from_secs(2);
+
+#[cfg(windows)]
+impl FileStamp {
+    fn is_stable(&self) -> bool {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        const UNIX_EPOCH_FILE_TIME: u128 = 116_444_736_000_000_000;
+        // Rapid Windows writes can share a timestamp. Only cache a summary if
+        // the timestamp was already settled before reading the file.
+        let latest = self.changed.max(self.written);
+        latest > 0
+            && SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .is_ok_and(|elapsed| {
+                    let now = UNIX_EPOCH_FILE_TIME + elapsed.as_nanos() / 100;
+                    now >= latest as u128 + FILE_TIME_SETTLE.as_nanos() / 100
+                })
+    }
+}
+
+#[cfg(not(windows))]
+impl FileStamp {
+    fn is_stable(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(windows)]
@@ -258,6 +289,8 @@ mod tests {
         let paths = [dir.path().join("a"), dir.path().join("b")];
         fs::write(&paths[0], "one:初始").unwrap();
         fs::write(&paths[1], "two:完整").unwrap();
+        #[cfg(windows)]
+        std::thread::sleep(FILE_TIME_SETTLE);
         let cache = Mutex::default();
         let parses = AtomicUsize::new(0);
         let scan = || {
@@ -303,6 +336,8 @@ mod tests {
         let cache = Mutex::default();
         let scan = || read_summaries(&cache, &paths, |_, file| read_fixture(file));
         fs::write(&path, "one:old").unwrap();
+        #[cfg(windows)]
+        std::thread::sleep(FILE_TIME_SETTLE);
         assert_eq!(scan().unwrap()[0].session_id, "one");
         let written = fs::metadata(&path).unwrap().modified().unwrap();
         fs::write(&replacement, "two:new").unwrap();
@@ -315,6 +350,8 @@ mod tests {
         fs::rename(&replacement, &path).unwrap();
         assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), written);
         assert_eq!(scan().unwrap()[0].session_id, "two");
+        #[cfg(windows)]
+        assert!(cache.lock().unwrap().files.is_empty());
 
         fs::write(&path, "invalid").unwrap();
         assert!(scan().unwrap_err().starts_with("QUERY_INVALID:"));
