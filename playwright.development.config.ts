@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({testDir:'./evals/development-ui',testMatch:'*.spec.ts',outputDir:(process.env.HOMEBASE_DEVELOPMENT_UI_ROOT||'.tmp/development-ui')+'/ui-results',workers:1,use:{channel:'msedge',baseURL:'http://127.0.0.1:1437',viewport:{width:1100,height:850},screenshot:'only-on-failure'},webServer:{command:'node evals/development-ui/server.mjs',url:'http://127.0.0.1:1437/evals/development-ui/index.html',timeout:120000}});

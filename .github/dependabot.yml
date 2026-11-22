@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns:
+          - "@tauri-apps/*"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router-dom"
+      dev-deps:
+        dependency-type: "development"
+
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      tauri-rs:
+        patterns:
+          - "tauri*"
+      tokio:
+        patterns:
+          - "tokio*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

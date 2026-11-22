@@ -1,0 +1,13 @@
+{
+  "name": "homebase-native-agent-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HomeBase-owned pinned native Agent transport; never changes global Agent installs or configuration.",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/gemini-cli": "0.68.0"
+  }
+}

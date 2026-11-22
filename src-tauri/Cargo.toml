@@ -1,0 +1,116 @@
+[package]
+name = "homebase"
+version = "0.1.0"
+description = "HomeBase 控制面板 - 本机 12 阶段产出的统一桌面外壳"
+authors = ["Gdnbit"]
+edition = "2021"
+rust-version = "1.77"
+# Phase G 引入 homebase-reveal 后必须显式声明默认 binary，否则 `cargo run` / `tauri dev` 不知道选哪个
+default-run = "homebase"
+
+[lib]
+name = "homebase_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Phase G · SOPS reveal helper（给 Claude Code apiKeyHelper / Codex auth.command / wrapper exec 用）
+# 极简 self-contained binary，不依赖 lib 也不依赖 tokio — 直接 spawn sops.exe
+[[bin]]
+name = "homebase-reveal"
+path = "src/bin/reveal.rs"
+
+# Phase E2 · MCP stdio server · 给 Studio 的 Claude Code 提供 generate_image 工具
+# self-contained binary · stdin/stdout 走 JSON-RPC 2.0 · reqwest blocking 调 OpenRouter Image API
+[[bin]]
+name = "homebase-mcp-image"
+path = "src/bin/mcp_image.rs"
+
+# S3 · MCP stdio server · 给 4 agent 提供共享 secret 拿取（runtime 询问 USER · ACL 持久化）
+# self-contained binary · stdin/stdout MCP JSON-RPC 2.0 · 反向 TCP 调 HomeBase IPC server
+[[bin]]
+name = "homebase-mcp-secrets"
+path = "src/bin/mcp_secrets.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 核心 + 插件
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-store = "2"
+tauri-plugin-process = "2"
+tauri-plugin-os = "2"
+tauri-plugin-clipboard-manager = "2"
+
+# 异步 + 序列化
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+toml_edit = "0.22"  # Phase G-3: 修改 ~/.codex/config.toml 时保留注释/格式
+
+# HTTP — Secrets 模块 health check（rustls-tls 避免 OpenSSL 依赖）+ E2 mcp-image binary blocking 调 OR
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+# Phase E2 · base64 解 OR Image API 返回的 data URL
+base64 = "0.22"
+png = "=0.17.16"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+aes = "0.8"
+ecb = { version = "0.1", features = ["alloc"] }
+md-5 = "0.10"
+
+# 工具
+notify = "6"             # 文件 watcher（Knowledge / Skills 模块用）
+thiserror = "1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+zeroize = { version = "1", features = ["serde"] }
+tempfile = "3"
+fs2 = "0.4"
+sha2 = "0.10"
+async-trait = "0.1"
+regex = "1"
+sysinfo = "0.32"         # 进程列表（Agents 模块）
+futures = "0.3"
+uuid = { version = "1", features = ["v4", "serde"] }
+dirs = "5"               # S1 · 跨平台 home_dir() · ~/.homebase/shared/context.toml
+
+# Phase E1 · Studio Checkpoint（zip 快照 _raw · 一键撤回 AI 改动）
+zip = { version = "2", default-features = false, features = ["deflate"] }
+walkdir = "2"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"           # S1 · 单元测试用临时目录避免污染真实配置
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_System_JobObjects",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[features]
+# 默认启用自定义协议（生产构建用）
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

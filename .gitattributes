@@ -1,0 +1,3 @@
+/control/commands.json text eol=lf
+/control/reference.md text eol=lf
+/src-tauri/src/control_dispatch.generated.rs text eol=lf

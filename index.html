@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)" />
+    <title>HomeBase · 本机控制面板</title>
+    <script>
+      // FOIT 防闪黑 — 在 React mount 前同步设 .dark class
+      // 来源：localStorage["homebase-app"].state.theme（zustand persist 写入的格式）
+      (function () {
+        try {
+          var raw = localStorage.getItem("homebase-app");
+          var theme = "system";
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            theme = (parsed && parsed.state && parsed.state.theme) || "system";
+          }
+          var isDark =
+            theme === "dark" ||
+            (theme === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (isDark) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {
+          // localStorage 不可用或 JSON 格式异常 → 走默认（system）
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

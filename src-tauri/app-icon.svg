@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HomeBase app icon — minimal home stroke
+  · Background: zinc-900 (#18181B), 圆角 ≈ 19.5%
+  · Foreground: lucide Home icon, white stroke 50px
+  · 1024×1024 base; tauri icon will downsample to 32/64/128/256 + ico/icns
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="200" ry="200" fill="#18181B"/>
+  <g transform="translate(212, 212) scale(25)" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </g>
+</svg>

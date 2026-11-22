@@ -1,0 +1,27 @@
+// Exercise the installer runtime subset in a new directory, never remove staging or user data.
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const repo=fileURLToPath(new URL('../',import.meta.url));
+const parent=process.env.HOMEBASE_AGENT_PACKAGE_LAB;
+const bubblewrap=process.env.HOMEBASE_BWRAP_SOURCE || path.join(repo,'agent-runtime/tools/bwrap');
+assert(fs.existsSync(bubblewrap),'Set HOMEBASE_BWRAP_SOURCE (see agent-runtime/tools/NOTICE.md)');
+assert.equal(crypto.createHash('sha256').update(fs.readFileSync(bubblewrap)).digest('hex'),'e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30f71');
+assert(parent && path.isAbsolute(parent),'Set HOMEBASE_AGENT_PACKAGE_LAB');
+fs.mkdirSync(parent,{recursive:true});
+const stage=fs.mkdtempSync(path.join(parent,'runtime-'));
+for(const name of ['pi-worker.mjs','package.json','package-lock.json'])fs.copyFileSync(path.join(repo,'agent-runtime',name),path.join(stage,name));
+for(const name of ['local','tools'])fs.cpSync(path.join(repo,'agent-runtime',name),path.join(stage,name),{recursive:true,errorOnExist:true,force:false});
+fs.copyFileSync(bubblewrap,path.join(stage,'tools','bwrap'));
+fs.copyFileSync(process.execPath,path.join(stage,'node.exe'));
+const install=spawnSync('npm.cmd',['ci','--ignore-scripts','--omit=dev','--no-audit','--no-fund'],{cwd:stage,env:process.env,windowsHide:true,shell:true,stdio:'inherit'});
+assert.equal(install.status,0,'Pinned runtime install failed');
+fs.mkdirSync(path.join(stage,'test-data'));
+const test=spawnSync(path.join(stage,'node.exe'),['--test',path.join(repo,'agent-runtime/test/worker.test.mjs'),path.join(repo,'agent-runtime/test/local-host.test.mjs')],{cwd:stage,env:{...process.env,HOMEBASE_PI_WORKER:path.join(stage,'pi-worker.mjs'),HOMEBASE_AGENT_LOCAL_HOST:path.join(stage,'local/host.mjs'),HOMEBASE_LOCAL_TEST_LAB:path.join(stage,'test-data')},windowsHide:true,stdio:'inherit'});
+assert.equal(test.status,0,'Packaged runtime graph test failed');
+const runtime_hashes=Object.fromEntries(['pi-worker.mjs','package.json','package-lock.json','local/host.mjs','local/policy.mjs','local/files.mjs','local/mcp.mjs','local/skills.mjs','local/terminal.mjs','local/sandbox-launch.py','tools/bwrap'].map(name=>[name,crypto.createHash('sha256').update(fs.readFileSync(path.join(stage,name))).digest('hex')]));
+fs.writeFileSync(path.join(stage,'validation.json'),JSON.stringify({stage,pinned_install:true,worker_restore_verified:true,local_unknown_verified:true,runtime_hashes,real_model_calls:0,real_wechat_messages:0},null,2));
+console.log(JSON.stringify({stage,passed:true}));

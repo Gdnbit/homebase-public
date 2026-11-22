@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HomeBase",
+  "version": "0.1.0",
+  "identifier": "io.github.gdnbit.homebase",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "HomeBase",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": [
+      "nsis"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "本机统一桌面控制面板",
+    "longDescription": "HomeBase 是本机 AI 与内容能力控制面板，包含可迁移的 ASR 工作台、模型推荐与下载、结果整理、密钥管理和 Agent 能力入口。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "Gdnbit",
+    "copyright": "Copyright © 2026 Gdnbit",
+    "homepage": "https://github.com/Gdnbit/homebase-public",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "displayLanguageSelector": false,
+        "compression": "lzma",
+        "startMenuFolder": "HomeBase"
+      }
+    }
+  }
+}

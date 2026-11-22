@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { transformSync } from 'esbuild';
+import vm from 'node:vm';
+
+process.env.TZ = 'Asia/Shanghai';
+const module = { exports: {} };
+vm.runInNewContext(transformSync(readFileSync(new URL('../src/lib/secret-lifecycle.ts', import.meta.url), 'utf8'), { loader: 'ts', format: 'cjs' }).code, { module, exports: module.exports, Date });
+const { expiryStatus, localDateToExpiry, expiryToLocalDate, secretStatus } = module.exports;
+const now = Date.parse('2026-11-08T04:00:00Z');
+let checks = 0;
+function check(actual, expected) { assert.equal(actual, expected); checks++; }
+check(expiryStatus(null, now).state, 'unknown');
+check(expiryStatus('invalid', now).state, 'invalid');
+check(expiryStatus('2026-11-08', now).state, 'invalid');
+check(expiryStatus('2026-02-29T04:00:00Z', now).state, 'invalid');
+check(expiryStatus('2026-04-31T04:00:00Z', now).state, 'invalid');
+check(expiryStatus('2026-11-08T03:59:59Z', now).state, 'expired');
+check(expiryStatus('2026-11-08T04:00:00Z', now).state, 'expired');
+check(expiryStatus('2026-11-15T04:00:00Z', now).state, 'expiring');
+check(expiryStatus('2026-11-15T04:00:00.001Z', now).state, 'valid');
+check(localDateToExpiry('2026-11-08'), '2026-11-08T15:59:59.999Z');
+check(expiryToLocalDate('2026-11-08T15:59:59.999Z'), '2026-11-08');
+check(localDateToExpiry('2028-02-29'), '2028-02-29T15:59:59.999Z');
+check(localDateToExpiry(''), '');
+check(expiryToLocalDate(localDateToExpiry('0099-11-08')), '0099-11-08');
+assert.throws(() => localDateToExpiry('2026-02-29')); checks++;
+assert.throws(() => localDateToExpiry('2026-13-01')); checks++;
+check(secretStatus({ configured: false, expires_at: null }, now), 'missing');
+check(secretStatus({ configured: true, expires_at: null }, now), 'filled');
+check(secretStatus({ configured: true, expires_at: '2020-01-01T00:00:00Z' }, now), 'warning');
+console.log(`Secret lifecycle: ${checks} checks passed (Asia/Shanghai; no vault access).`);

@@ -1,0 +1,11 @@
+请接管 HomeBase，完成我接下来给出的具体任务。
+
+项目目录：{{PROJECT_ROOT}}
+首先读取：{{START_FILE}}
+再按该文件的导航读取操作说明，执行：
+node "{{CLI_FILE}}" doctor
+node "{{CLI_FILE}}" commands
+
+普通操作只需启动说明和接口文档，无需阅读源码。按 control/reference.md 发现功能，用 describe <command> 查看完整参数/返回 schema、前置条件和完成标准；用 validate <command> --input 文件 离线检查后调用。示例占位符需替换为查询获得的值。控制 job 完成后继续查询业务状态和结果；流式任务按 OPERATIONS.md 查询 task_events_get。缺失或禁止的接口明确报告，不自行改代码绕过。
+
+在当前用户授权范围内调用 CLI，查询任务和真实结果；沿用已有授权，不重复询问已授权的操作。当前任务由我接下来提供。启动提示词本身不授权发布、账户变更或其他无关操作。不把文件存在、任务编号或占位返回视为任务完成。不读取或输出真实密钥正文。

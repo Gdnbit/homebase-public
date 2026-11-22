@@ -1,0 +1,14 @@
+# Built-in Extensions
+
+按 v3 §23 改名（原 plugins/_builtin/ → extensions/_builtin/）。
+
+Phase 13.2 启动时填充 6 个内置 extension：
+- dashboard
+- agents-claude-code / agents-codex / agents-gemini / agents-openclaw / agents-hermes
+- secrets
+- knowledge
+- system
+- tasks (v3 新增)
+- skills (v3 新增)
+
+每个 extension 含：extension.toml + ui/ + 可选 backend/

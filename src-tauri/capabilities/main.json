@@ -1,0 +1,29 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "HomeBase 主窗口能力 — Phase 13.1 MVP 用最小权限集；Phase 13.2 收紧到 scoped allowlist",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:webview:default",
+    "core:app:default",
+    "core:path:default",
+    "fs:default",
+    "shell:default",
+    "shell:allow-execute",
+    "shell:allow-open",
+    "dialog:default",
+    "notification:default",
+    "sql:default",
+    "store:default",
+    "process:default",
+    "os:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text"
+  ]
+}

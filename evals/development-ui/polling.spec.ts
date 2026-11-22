@@ -1,0 +1,22 @@
+import { test, expect } from '@playwright/test';
+const taskA='dev-'+'a'.repeat(32),taskB='dev-'+'b'.repeat(32);
+async function openRunning(page:any){await page.goto('/evals/development-ui/index.html');await expect(page.getByRole('button',{name:'运行开发',exact:true})).toBeEnabled();await page.getByLabel('项目目录',{exact:true}).fill('F:/Synthetic/project');await page.getByLabel('开发需求',{exact:true}).fill('仅合成状态查询');await page.getByRole('button',{name:'运行开发',exact:true}).click();await expect(page.getByText('已受理 · 待执行',{exact:true})).toBeVisible();}
+async function reads(page:any){return page.evaluate(()=>(window as any).__development.calls.filter((c:any)=>c.command==='development_result'));}
+async function visibility(page:any,hidden:boolean){await page.evaluate(value=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>value});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>value?'hidden':'visible'});document.dispatchEvent(new Event('visibilitychange'));},hidden);}
+test('concurrent refreshes of the same original task share one read',async({page})=>{
+  await openRunning(page);await page.evaluate(()=>(window as any).__development.resultDelay=800);await page.getByRole('button',{name:'刷新原任务',exact:true}).dblclick();await expect.poll(async()=> (await reads(page)).length).toBe(1);await expect(page.getByText('执行中',{exact:true})).toBeVisible();expect(await reads(page)).toHaveLength(1);
+});
+test('hidden windows pause polling and visibility refresh stops at a terminal result',async({page})=>{
+  await page.clock.install();await openRunning(page);await visibility(page,true);await page.clock.runFor(12000);expect(await reads(page)).toHaveLength(0);
+  await page.evaluate(()=>(window as any).__development.phase='verified');await visibility(page,false);await expect(page.getByText('宿主验收通过',{exact:true})).toBeVisible();expect(await reads(page)).toHaveLength(1);await page.clock.runFor(12000);expect(await reads(page)).toHaveLength(1);
+});
+test('polling the previous result cannot preempt a newly selected task',async({page})=>{
+  await page.clock.install();await openRunning(page);await page.evaluate(()=>(window as any).__development.resultDelay=5000);await page.getByText('查询已有任务',{exact:true}).click();await page.getByLabel('已有开发任务编号').fill(taskB);await page.getByRole('button',{name:'查询任务',exact:true}).click();await page.clock.runFor(4000);
+  expect((await reads(page)).map((c:any)=>c.args.taskId)).toEqual([taskB]);await page.clock.runFor(1000);await expect(page.getByText(`任务编号：${taskB}`,{exact:true})).toBeVisible();
+});
+test('an explicit A to B to A selection reuses the in-flight read and presents A',async({page})=>{
+  await page.clock.install();await openRunning(page);await page.evaluate(()=>(window as any).__development.resultDelay=1000);await page.getByRole('button',{name:'刷新原任务',exact:true}).click();await page.getByText('查询已有任务',{exact:true}).click();await page.getByLabel('已有开发任务编号').fill(taskB);await page.getByRole('button',{name:'查询任务',exact:true}).click();await page.getByLabel('已有开发任务编号').fill(taskA);await page.getByRole('button',{name:'查询任务',exact:true}).click();expect((await reads(page)).map((c:any)=>c.args.taskId)).toEqual([taskA,taskB]);await page.clock.runFor(1000);await expect(page.getByText(`任务编号：${taskA}`,{exact:true})).toBeVisible();
+});
+test('post-answer refresh never reuses a pre-answer question observation',async({page})=>{
+  await page.clock.install();await openRunning(page);await page.evaluate(()=>{const s=(window as any).__development;s.phase='awaiting_input';s.questions=[{id:8,title:'合成旧问题',options:['明确继续']}];});await page.getByRole('button',{name:'刷新原任务',exact:true}).click();await expect(page.getByRole('button',{name:'明确继续',exact:true})).toBeVisible();await page.evaluate(()=>(window as any).__development.resultDelay=10000);await page.getByRole('button',{name:'刷新原任务',exact:true}).click();await page.getByRole('button',{name:'明确继续',exact:true}).click();await expect(page.getByText('执行中',{exact:true})).toBeVisible();await page.evaluate(()=>{const s=(window as any).__development;s.resultDelay=0;s.phase='running';});await page.getByRole('button',{name:'刷新原任务',exact:true}).click();expect(await reads(page)).toHaveLength(3);await page.clock.runFor(10000);await expect(page.getByRole('button',{name:'明确继续',exact:true})).toHaveCount(0);await expect(page.getByText('执行中',{exact:true})).toBeVisible();
+});

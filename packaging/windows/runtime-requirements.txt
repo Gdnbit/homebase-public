@@ -1,0 +1,8 @@
+# Cloud ASR plus the supported CPU-local baseline. Model weights are not bundled.
+requests==2.34.2
+huggingface-hub==1.7.2
+faster-whisper==1.2.1
+ctranslate2==4.7.1
+av==17.0.1
+tokenizers==0.22.2
+onnxruntime==1.24.4
