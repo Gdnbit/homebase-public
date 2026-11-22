@@ -96,3 +96,10 @@ keystore.properties
 .codebase-memory/
 src-tauri/resources/distribution/
 .ai/audits/
+
+# Local HomeBase state and test results
+.homebase/
+playwright-report/
+test-results/
+private-data/
+business-data/

@@ -15,6 +15,7 @@
     "test:secrets:native": "node scripts/test-secret-lifecycle-native.mjs",
     "test:secrets:ui": "playwright test --config playwright.secret-lifecycle.config.ts",
     "hb": "node scripts/homebase.mjs",
+    "privacy:check": "node scripts/check-public-privacy.mjs",
     "control:generate": "node scripts/generate-control-contract.mjs",
     "control:check": "node scripts/generate-control-contract.mjs --check",
     "test:control": "node scripts/run-control-tests.mjs",

@@ -58,4 +58,8 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 - [能力库](docs/capability-library.md) · [能力发现接口](docs/capability-discovery.md)
 - [架构](docs/architecture.md) · [维护迭代](docs/maintenance-goal.md)
 
-公开仓库包含源码、合成测试和接口文档。模型权重、凭据、个人配置、会话、真实产物和可执行分发包由使用者另行准备。第三方组件按其各自的许可提供。 [第三方说明](packaging/windows/THIRD-PARTY-NOTICES.md)
+公开仓库包含源码、合成测试和接口文档。模型权重、凭据、个人配置、会话、真实产物和可执行分发包由使用者另行准备。贡献前请启用提交和推送隐私检查。 [提交流程](CONTRIBUTING.md)
+
+## 许可证
+
+HomeBase 项目自身源码和文档使用 MIT 许可证。第三方组件及其原有材料遵循各自的许可。 [MIT 许可证](LICENSE) · [第三方说明](packaging/windows/THIRD-PARTY-NOTICES.md)

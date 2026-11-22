@@ -43,6 +43,8 @@ tags: [homebase, agent-rules, tauri, react, rust]
 
 ## 秘密与隐私
 
+- 发布改动前遵循 [公开仓库提交流程](CONTRIBUTING.md)，从公开检出提交审查后的源码、文档和合成测试。
+
 - 不读取、输出、记录或复制 `.env*` 中的真实值、SOPS 解密结果、令牌、私钥和数据库连接串。
 - 秘密只通过本机受控包装器注入目标子进程；不写入 SQLite、日志、剪贴板、前端状态或错误消息。
 - `C:\HomeBase\Private`、`C:\HomeBase\Wiki\raw` 与遗留 `C:\HomeBase\Wiki\_raw` 不得被 HomeBase 通用索引批量读取。
