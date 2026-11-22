@@ -105,12 +105,14 @@ async fn auth_long_retry_after_opt_out_and_noninference_do_not_retry() {
 }
 #[tokio::test]
 async fn timeout_after_submission_is_unknown_and_never_retried() {
-    let (url, count, worker) = server(vec![http(200, "")], Duration::from_millis(300)).await;
+    // Leave time for the loopback request to arrive on a busy runner, while
+    // keeping the response pending until after the client's timeout.
+    let (url, count, worker) = server(vec![http(200, "")], Duration::from_secs(30)).await;
     let error = send_limited(
         reqwest::Client::new().post(url),
         true,
-        Duration::from_secs(1),
-        Duration::from_millis(50),
+        Duration::from_secs(5),
+        Duration::from_secs(2),
     )
     .await
     .err()

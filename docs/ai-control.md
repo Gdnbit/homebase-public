@@ -68,12 +68,17 @@ CLI 同时呈现控制 job 状态和业务 `result_state`。空结果、未知/�
 ```powershell
 npm run control:generate
 npm run control:check
+npm ci --prefix agent-runtime --ignore-scripts
 npm run test:control
 npm run test:control:contract
 cargo check --manifest-path src-tauri/Cargo.toml --all-targets
 ```
 
 `test:control` 用独立 Cargo harness 编译实际生产传输和操作状态模块，再启动只实现合成业务的本机夹具，使用真实 CLI 进行端到端测试。夹具明确指定临时目录和自己的可执行文件，不回退启动真实 HomeBase 或读取真实端点、密钥及 Agent 配置。CLI 子进程清空个人环境并重定向用户目录。
+
+启动检查测试在系统临时目录创建模拟助理与微信账本，可在任意本地盘运行。测试借助 Pi 运行时依赖执行模拟交互。
+
+Windows 的控制端点和私有状态文件通过系统 API 将访问权限授予当前进程用户。测试覆盖长路径下的权限继承边界、原子替换和文档解析中的并发保存。
 
 完成验证后从当前源码重新编译并启动桌面应用，运行 `hb doctor` 检查协议一致性。安装包内的 CLI、文档及能力资源分发仍需按 Windows 打包流程另行纳入；本轮交付位置是当前源码项目。
 

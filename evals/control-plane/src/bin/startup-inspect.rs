@@ -487,10 +487,11 @@ fn run() -> Result<Value, &'static str> {
     let test = args.len() == 7;
     if test
         && (args[6] != "--test-gate"
+            || root.parent() != Some(std::env::temp_dir().as_path())
             || !root
-                .to_string_lossy()
-                .replace('\\', "/")
-                .starts_with("F:/HomeBase-Labs/")
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("startup-inspect-"))
             || std::env::var_os("HOMEBASE_TEST_HOME").is_none_or(|v| PathBuf::from(v) != root))
     {
         return Err("STARTUP_TEST_GATE_REJECTED");

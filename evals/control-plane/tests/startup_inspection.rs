@@ -15,25 +15,18 @@ fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 struct Fixture {
-    root: PathBuf,
+    root: tempfile::TempDir,
     assistant: PathBuf,
     channel: PathBuf,
 }
 impl Fixture {
     fn new(a: Value, c: Value) -> Self {
-        let base =
-            PathBuf::from(std::env::var_os("HOMEBASE_TEST_HOME").expect("explicit isolated home"));
-        assert!(base
-            .to_string_lossy()
-            .replace('\\', "/")
-            .starts_with("F:/HomeBase-Labs/"));
         let root = tempfile::Builder::new()
             .prefix("startup-inspect-")
-            .tempdir_in(base)
-            .unwrap()
-            .keep();
-        let assistant = root.join(".homebase/assistant/state.dpapi");
-        let channel = root.join(".homebase/wechat/channel.dpapi");
+            .tempdir()
+            .unwrap();
+        let assistant = root.path().join(".homebase/assistant/state.dpapi");
+        let channel = root.path().join(".homebase/wechat/channel.dpapi");
         fs::create_dir_all(assistant.parent().unwrap()).unwrap();
         fs::create_dir_all(channel.parent().unwrap()).unwrap();
         fs::write(
@@ -54,7 +47,7 @@ impl Fixture {
     }
     fn command(&self) -> Command {
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_startup-inspect"));
-        cmd.args(["--profile-root"]).arg(&self.root).args([
+        cmd.arg("--profile-root").arg(self.root.path()).args([
             "--assistant-sha256",
             &digest(&fs::read(&self.assistant).unwrap()),
             "--wechat-sha256",
@@ -77,7 +70,7 @@ impl Fixture {
                 .count(),
             1
         );
-        assert_eq!(fs::read_dir(&self.root).unwrap().count(), 1);
+        assert_eq!(fs::read_dir(self.root.path()).unwrap().count(), 1);
     }
     fn snapshot(&self) -> [Vec<u8>; 2] {
         [
@@ -253,7 +246,7 @@ fn invalid_paths_and_test_gate_context_are_rejected() {
     inspect(
         f.command()
             .arg("--test-gate")
-            .env("HOMEBASE_TEST_HOME", f.root.join("different"))
+            .env("HOMEBASE_TEST_HOME", f.root.path().join("different"))
             .output()
             .unwrap(),
         Some("STARTUP_TEST_GATE_REJECTED"),
@@ -261,7 +254,7 @@ fn invalid_paths_and_test_gate_context_are_rejected() {
     inspect(
         f.command()
             .arg("--other")
-            .env("HOMEBASE_TEST_HOME", &f.root)
+            .env("HOMEBASE_TEST_HOME", f.root.path())
             .output()
             .unwrap(),
         Some("STARTUP_TEST_GATE_REJECTED"),
@@ -269,7 +262,18 @@ fn invalid_paths_and_test_gate_context_are_rejected() {
     inspect(
         f.command()
             .arg("--test-gate")
-            .env("HOMEBASE_TEST_HOME", &f.root)
+            .env("HOMEBASE_TEST_HOME", f.root.path())
+            .env("TMP", f.root.path())
+            .env("TEMP", f.root.path())
+            .stdin(Stdio::null())
+            .output()
+            .unwrap(),
+        Some("STARTUP_TEST_GATE_REJECTED"),
+    );
+    inspect(
+        f.command()
+            .arg("--test-gate")
+            .env("HOMEBASE_TEST_HOME", f.root.path())
             .stdin(Stdio::null())
             .output()
             .unwrap(),
@@ -284,7 +288,7 @@ fn deterministic_change_after_inspection_and_before_final_check_is_rejected() {
         let mut child = f
             .command()
             .arg("--test-gate")
-            .env("HOMEBASE_TEST_HOME", &f.root)
+            .env("HOMEBASE_TEST_HOME", f.root.path())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

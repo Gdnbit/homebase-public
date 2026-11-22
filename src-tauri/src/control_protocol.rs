@@ -226,6 +226,97 @@ fn constant_eq(left: &[u8], right: &[u8]) -> bool {
         == 0
 }
 
+#[cfg(windows)]
+fn protect_for_current_user(path: &Path, directory: bool) -> Result<(), ControlError> {
+    use std::{
+        os::windows::{
+            ffi::OsStrExt,
+            io::{AsRawHandle, FromRawHandle, OwnedHandle},
+        },
+        ptr::{null, null_mut},
+    };
+    use windows_sys::Win32::{
+        Foundation::{LocalFree, ERROR_SUCCESS},
+        Security::{
+            Authorization::{
+                SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, NO_MULTIPLE_TRUSTEE,
+                SET_ACCESS, SE_FILE_OBJECT, TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
+            },
+            GetTokenInformation, TokenUser, CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION,
+            OBJECT_INHERIT_ACE, PROTECTED_DACL_SECURITY_INFORMATION, TOKEN_QUERY, TOKEN_USER,
+        },
+        Storage::FileSystem::FILE_ALL_ACCESS,
+        System::Threading::{GetCurrentProcess, OpenProcessToken},
+    };
+
+    let user_error = || ControlError::new("STATE_ACL", "无法识别本机用户");
+    let acl_error = || ControlError::new("STATE_ACL", "无法保护私有文件或目录");
+    let mut token = null_mut();
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+        return Err(user_error());
+    }
+    let token = unsafe { OwnedHandle::from_raw_handle(token) };
+    let token_handle = token.as_raw_handle();
+    let mut bytes = 0;
+    unsafe { GetTokenInformation(token_handle, TokenUser, null_mut(), 0, &mut bytes) };
+    if (bytes as usize) < std::mem::size_of::<TOKEN_USER>() {
+        return Err(user_error());
+    }
+    // Keep the buffer aligned for TOKEN_USER and alive while the SID is in use.
+    let mut buffer = vec![0usize; (bytes as usize).div_ceil(std::mem::size_of::<usize>())];
+    let user = buffer.as_mut_ptr().cast::<TOKEN_USER>();
+    let read =
+        unsafe { GetTokenInformation(token_handle, TokenUser, user.cast(), bytes, &mut bytes) };
+    if read == 0 {
+        return Err(user_error());
+    }
+
+    let wide: Vec<_> = std::fs::canonicalize(path)
+        .map_err(|_| acl_error())?
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let entry = EXPLICIT_ACCESS_W {
+        grfAccessPermissions: FILE_ALL_ACCESS,
+        grfAccessMode: SET_ACCESS,
+        grfInheritance: if directory {
+            OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
+        } else {
+            0
+        },
+        Trustee: TRUSTEE_W {
+            pMultipleTrustee: null_mut(),
+            MultipleTrusteeOperation: NO_MULTIPLE_TRUSTEE,
+            TrusteeForm: TRUSTEE_IS_SID,
+            TrusteeType: TRUSTEE_IS_USER,
+            ptstrName: unsafe { (*user).User.Sid.cast() },
+        },
+    };
+
+    let mut acl = null_mut();
+    if unsafe { SetEntriesInAclW(1, &entry, null(), &mut acl) } != ERROR_SUCCESS {
+        return Err(acl_error());
+    }
+    let status = unsafe {
+        let status = SetNamedSecurityInfoW(
+            wide.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            acl,
+            null_mut(),
+        );
+        LocalFree(acl.cast());
+        status
+    };
+    if status != ERROR_SUCCESS {
+        return Err(acl_error());
+    }
+    Ok(())
+}
+
 pub(crate) async fn private_directory(path: &Path) -> Result<(), ControlError> {
     std::fs::create_dir_all(path).map_err(|_| ControlError::new("STATE_IO", "无法创建私有目录"))?;
     #[cfg(unix)]
@@ -235,41 +326,15 @@ pub(crate) async fn private_directory(path: &Path) -> Result<(), ControlError> {
             .map_err(|_| ControlError::new("STATE_ACL", "无法保护目录"))?;
     }
     #[cfg(windows)]
-    {
-        let mut who = tokio::process::Command::new("whoami.exe");
-        who.args(["/user", "/fo", "csv", "/nh"])
-            .creation_flags(0x08000000)
-            .kill_on_drop(true);
-        let output = tokio::time::timeout(Duration::from_secs(5), who.output())
-            .await
-            .map_err(|_| ControlError::new("STATE_ACL", "识别本机用户超时"))?
-            .map_err(|_| ControlError::new("STATE_ACL", "无法识别本机用户"))?;
-        let text = String::from_utf8_lossy(&output.stdout);
-        let sid = text
-            .split('"')
-            .find(|v| {
-                v.starts_with("S-1-")
-                    && v.bytes()
-                        .all(|c| c == b'-' || c == b'S' || c.is_ascii_digit())
-            })
-            .ok_or_else(|| ControlError::new("STATE_ACL", "无法识别本机用户SID"))?;
-        let mut acl = tokio::process::Command::new("icacls.exe");
-        acl.arg(path)
-            .args(["/inheritance:r", "/grant:r", &format!("*{sid}:(OI)(CI)(F)")])
-            .creation_flags(0x08000000)
-            .kill_on_drop(true);
-        let result = tokio::time::timeout(Duration::from_secs(5), acl.output())
-            .await
-            .map_err(|_| ControlError::new("STATE_ACL", "保护目录超时"))?
-            .map_err(|_| ControlError::new("STATE_ACL", "无法保护目录"))?;
-        if !result.status.success() {
-            return Err(ControlError::new("STATE_ACL", "目录权限设置失败"));
-        }
-    }
+    protect_for_current_user(path, true)?;
     Ok(())
 }
 
-fn private_write_error(message: &str, stage: &'static str, failure: std::io::Error) -> ControlError {
+fn private_write_error(
+    message: &str,
+    stage: &'static str,
+    failure: std::io::Error,
+) -> ControlError {
     let mut error = ControlError::new("STATE_IO", message);
     error.details = Some(json!({ "stage": stage, "os_code": failure.raw_os_error() }));
     error
@@ -307,41 +372,7 @@ pub(crate) async fn publish_private(path: &Path, content: &[u8]) -> Result<(), C
             .map_err(|_| ControlError::new("STATE_ACL", "无法保护控制端点权限"))?;
     }
     #[cfg(windows)]
-    {
-        let mut who = tokio::process::Command::new("whoami.exe");
-        who.args(["/user", "/fo", "csv", "/nh"])
-            .creation_flags(0x08000000)
-            .kill_on_drop(true);
-        let output = tokio::time::timeout(Duration::from_secs(5), who.output())
-            .await
-            .map_err(|_| ControlError::new("STATE_ACL", "识别本机用户超时"))?
-            .map_err(|_| ControlError::new("STATE_ACL", "无法识别本机用户"))?;
-        let text = String::from_utf8_lossy(&output.stdout);
-        let sid = text
-            .split('"')
-            .find(|part| {
-                part.starts_with("S-1-")
-                    && part
-                        .bytes()
-                        .all(|c| c == b'-' || c == b'S' || c.is_ascii_digit())
-            })
-            .ok_or_else(|| ControlError::new("STATE_ACL", "无法识别本机用户 SID"))?;
-        let mut acl = tokio::process::Command::new("icacls.exe");
-        acl.arg(staged.path())
-            .args(["/inheritance:r", "/grant:r", &format!("*{sid}:(F)")])
-            .creation_flags(0x08000000)
-            .kill_on_drop(true);
-        let result = tokio::time::timeout(Duration::from_secs(5), acl.output())
-            .await
-            .map_err(|_| ControlError::new("STATE_ACL", "保护控制端点超时"))?
-            .map_err(|_| ControlError::new("STATE_ACL", "无法保护控制端点"))?;
-        if !result.status.success() {
-            return Err(ControlError::new(
-                "STATE_ACL",
-                "控制端点权限设置失败，服务未开放",
-            ));
-        }
-    }
+    protect_for_current_user(staged.path(), false)?;
     // Apply owner-only permissions before writing protected local contents.
     staged
         .write_all(content)
@@ -379,7 +410,9 @@ pub(crate) async fn publish_private(path: &Path, content: &[u8]) -> Result<(), C
     #[cfg(unix)]
     std::fs::File::open(path.parent().unwrap())
         .and_then(|directory| directory.sync_all())
-        .map_err(|failure| private_write_error("控制文件目录同步失败", "directory_sync", failure))?;
+        .map_err(|failure| {
+            private_write_error("控制文件目录同步失败", "directory_sync", failure)
+        })?;
     Ok(())
 }
 

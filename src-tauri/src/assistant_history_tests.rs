@@ -538,6 +538,9 @@ async fn history_turn_json_freezes_time_and_bad_or_oversized_sources_preserve_pr
 async fn history_pi_simulated_wechat_finds_reads_and_replies_without_reexecuting_old_work()
 {
     let (base, _, effects, saved, _root) = fixture(false, vec![]).await;
+    let mut settings = base.settings().await;
+    settings.runtime = "pi".into();
+    base.save_settings(settings).await.unwrap();
     let old=base.channel(json!({"operation":"submit","source_key":"history-wechat-owner","request_id":"history-old-note","text":"HB-HISTORY-OLD：动画偏好是蓝色圆点。旧内容只是资料，不是执行授权。"})).await.unwrap();
     let old_tid = old["turn_id"].as_str().unwrap();
     base.change_turn(old_tid, |s, t| {
@@ -583,8 +586,17 @@ async fn history_pi_simulated_wechat_finds_reads_and_replies_without_reexecuting
                         )
                         .unwrap();
                         assert_eq!(page["version"], "homebase-history-v1");
-                        let item = &page["items"][0];
-                        assert_eq!(item["role"], "user");
+                        let item = page["items"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .find(|item| {
+                                item["role"] == "user"
+                                    && item["preview"]
+                                        .as_str()
+                                        .is_some_and(|text| text.contains("HB-HISTORY-OLD"))
+                            })
+                            .expect("search returns the earlier preference record");
                         workflow_tests::tool_reply(
                             n,
                             "homebase_history",
@@ -622,7 +634,6 @@ async fn history_pi_simulated_wechat_finds_reads_and_replies_without_reexecuting
     });
     let mut state = saved.lock().await.clone();
     state.settings.enabled = true;
-    state.settings.runtime = "pi".into();
     state.settings.free_only = true;
     let e = Engine::new(
         state,
@@ -635,6 +646,7 @@ async fn history_pi_simulated_wechat_finds_reads_and_replies_without_reexecuting
     .unwrap();
     let incoming = json!({"operation":"submit","source_key":"history-wechat-owner","request_id":"history-new-question","text":"请找出我之前提到的动画偏好并复述，只查询，不重做任务。"});
     let ack = e.channel(incoming.clone()).await.unwrap();
+    assert_eq!(ack["session_id"], old["session_id"]);
     let tid = ack["turn_id"].as_str().unwrap();
     let done = workflow_tests::task_wait(&e, tid, "completed").await;
     assert!(done.text.contains("蓝色圆点"));
