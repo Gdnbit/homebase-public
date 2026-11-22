@@ -62,7 +62,8 @@ export function contract(projectRoot = root) {
     if (!classified.has(name))
       throw new Error(`Review control/policy.json for new command: ${name}`);
     const source = `src-tauri/src/commands/${module}.rs`;
-    const text = fs.readFileSync(path.join(projectRoot, source), "utf8");
+    // Rust comments contribute to the public contract hash on every platform.
+    const text = fs.readFileSync(path.join(projectRoot, source), "utf8").replace(/\r\n/g, "\n");
     const signature = new RegExp(
       `pub (async )?fn ${name}\\s*\\(([\\s\\S]*?)\\)\\s*->\\s*([^\\{]+)\\{`,
     ).exec(text);
@@ -83,7 +84,7 @@ export function contract(projectRoot = root) {
     const prefix = text.slice(0, signature.index);
     const docs = /((?:\/\/\/[^\n]*\n)+)\s*#\[tauri::command\]\s*$/
       .exec(prefix)?.[1]
-      ?.replace(/^\/\/\/\s?/gm, "")
+      ?.replace(/^\/\/\/[ \t]?/gm, "")
       .trim();
     commands.push({
       name,

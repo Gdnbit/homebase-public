@@ -43,7 +43,7 @@ const comments = (text) => text.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, " ");
 const attrs = (text) =>
   [...text.matchAll(/#\[serde\(([^\]]*)\)\]/g)].map((m) => m[1]).join(",");
 const docs = (text) =>
-  [...text.matchAll(/^\s*\/\/\/\s?(.*)$/gm)]
+  [...text.matchAll(/^[ \t]*\/\/\/[ \t]?(.*)$/gm)]
     .map((m) => m[1])
     .join(" ")
     .trim();
@@ -85,7 +85,7 @@ export function schemaReader(root) {
   const source = new Map();
   for (const filename of files(path.join(root, "src-tauri/src"))) {
     const relative = path.relative(root, filename).replaceAll("\\", "/");
-    const text = fs.readFileSync(filename, "utf8");
+    const text = fs.readFileSync(filename, "utf8").replace(/\r\n/g, "\n");
     source.set(relative, text);
     for (const match of text.matchAll(
       /pub\s+(struct|enum|type)\s+(\w+)\s*([<{=])/g,

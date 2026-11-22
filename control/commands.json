@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "protocol_version": 1,
-  "catalog_hash": "bc41c2c39a3b23106fa7e02a3bf337f716e4468b0c8468dae91dbef0064cf080",
+  "catalog_hash": "871f8eee88b017d625eb865ec3e31c84abfeb131d325c78ca347cbbea5bd6dc6",
   "$defs": {
     "commands__agent_versions__AgentVersionInfo__output": {
       "type": "object",
@@ -7867,7 +7867,7 @@
               "type": "null"
             }
           ],
-          "description": "**软弃用**：Phase G 后密钥从 SOPS `gdnbit_content_api_key` 取，不再从此读     /// 仅为了兼容旧 `~/.homebase/gdnbit.json` 中可能已写入的字段。 运行时应始终走 SOPS（参见 `fetch_api_key`）。"
+          "description": "**软弃用**：Phase G 后密钥从 SOPS `gdnbit_content_api_key` 取，不再从此读  仅为了兼容旧 `~/.homebase/gdnbit.json` 中可能已写入的字段。 运行时应始终走 SOPS（参见 `fetch_api_key`）。"
         },
         "vault_path": {
           "type": "string",
@@ -8047,7 +8047,7 @@
               "type": "null"
             }
           ],
-          "description": "**软弃用**：Phase G 后密钥从 SOPS `gdnbit_content_api_key` 取，不再从此读     /// 仅为了兼容旧 `~/.homebase/gdnbit.json` 中可能已写入的字段。 运行时应始终走 SOPS（参见 `fetch_api_key`）。",
+          "description": "**软弃用**：Phase G 后密钥从 SOPS `gdnbit_content_api_key` 取，不再从此读  仅为了兼容旧 `~/.homebase/gdnbit.json` 中可能已写入的字段。 运行时应始终走 SOPS（参见 `fetch_api_key`）。",
           "default": null
         },
         "vault_path": {
@@ -13777,7 +13777,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/agents_history.rs",
       "line": 175,
-      "description": "Phase H · 跨 agent 历史聚合(all agents 合并列表)\r\n\n用于 `/history` 页面的总览视图。每条都带 agent_id，方便前端显示图标。\r\n按 last_active_at 倒序；unsupported 的 agent 被静默跳过(不进聚合)。",
+      "description": "Phase H · 跨 agent 历史聚合(all agents 合并列表)\n\n用于 `/history` 页面的总览视图。每条都带 agent_id，方便前端显示图标。\n按 last_active_at 倒序；unsupported 的 agent 被静默跳过(不进聚合)。",
       "output_type": "Result<HistoryAllResult, String>",
       "input_schema": {
         "type": "object",
@@ -23153,7 +23153,7 @@
       ],
       "source": "src-tauri/src/commands/wiki.rs",
       "line": 251,
-      "description": "用 Typora 打开 markdown 文件\n**优先级**：\n1. `C:\\HomeBase\\Tools\\Typora\\Typora.exe`（已知用户安装位置）\n2. `C:\\Program Files\\Typora\\Typora.exe`\n3. `C:\\Program Files (x86)\\Typora\\Typora.exe`\n4. fallback: 用 OS 默认应用打开（`tauri-plugin-shell` 的 open）\n**安全**：\n- 路径必须存在\n- 后缀必须 .md / .markdown / .txt\n- spawn 时附 CREATE_NO_WINDOW 防闪窗",
+      "description": "用 Typora 打开 markdown 文件\n\n**优先级**：\n1. `C:\\HomeBase\\Tools\\Typora\\Typora.exe`（已知用户安装位置）\n2. `C:\\Program Files\\Typora\\Typora.exe`\n3. `C:\\Program Files (x86)\\Typora\\Typora.exe`\n4. fallback: 用 OS 默认应用打开（`tauri-plugin-shell` 的 open）\n\n**安全**：\n- 路径必须存在\n- 后缀必须 .md / .markdown / .txt\n- spawn 时附 CREATE_NO_WINDOW 防闪窗",
       "output_type": "Result<TyporaResult, String>",
       "input_schema": {
         "type": "object",
@@ -23210,7 +23210,7 @@
       ],
       "source": "src-tauri/src/commands/docs.rs",
       "line": 120,
-      "description": "读取单篇文档全文（仅 .md / .markdown / .txt，且大小 ≤ 5 MB）\r\n\n**路径解析规则**：\r\n- INDEX.md path 列含盘符（`E:\\...` / `C:\\...`） → 视为绝对路径直接读\r\n- 否则 → join 到 INDEX.md 所在目录（`本机操作指南/`）\r\n\n**安全约束**（不依赖用户行为，仅作健壮性兜底）：\r\n- 文件后缀必须 .md / .markdown / .txt\r\n- 文件大小 ≤ 5 MB（防止误读大二进制 / OOM）\r\n- 路径必须能 canonicalize 成功（拒绝符号链接环路 / 不存在）\r\n\n返回 `DocContent`：缺失 / 过大 / 后缀不对 时 `content = None`，`error` 给原因",
+      "description": "读取单篇文档全文（仅 .md / .markdown / .txt，且大小 ≤ 5 MB）\n\n**路径解析规则**：\n- INDEX.md path 列含盘符（`E:\\...` / `C:\\...`） → 视为绝对路径直接读\n- 否则 → join 到 INDEX.md 所在目录（`本机操作指南/`）\n\n**安全约束**（不依赖用户行为，仅作健壮性兜底）：\n- 文件后缀必须 .md / .markdown / .txt\n- 文件大小 ≤ 5 MB（防止误读大二进制 / OOM）\n- 路径必须能 canonicalize 成功（拒绝符号链接环路 / 不存在）\n\n返回 `DocContent`：缺失 / 过大 / 后缀不对 时 `content = None`，`error` 给原因",
       "output_type": "Result<DocContent, String>",
       "input_schema": {
         "type": "object",
@@ -28647,7 +28647,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/secrets.rs",
       "line": 456,
-      "description": "列出全部 keys（合并 secrets.yaml 实际内容 + meta 注册表）\n行为：\n- secrets.yaml 里有 → 真实 masked + 元数据\n- meta 表有但 yaml 没有 → masked = \"(missing)\"，提示该 key 还没装\n- yaml 有但 meta 表没有 → category = Unknown",
+      "description": "列出全部 keys（合并 secrets.yaml 实际内容 + meta 注册表）\n\n行为：\n- secrets.yaml 里有 → 真实 masked + 元数据\n- meta 表有但 yaml 没有 → masked = \"(missing)\"，提示该 key 还没装\n- yaml 有但 meta 表没有 → category = Unknown",
       "output_type": "Result<Vec<SecretInfo>, String>",
       "input_schema": {
         "type": "object",
@@ -28895,7 +28895,7 @@
       ],
       "source": "src-tauri/src/commands/secrets.rs",
       "line": 645,
-      "description": "注册或更新 secrets-meta.json 中某个 key 的元数据（expires_at / display_name）\n**Merge 语义**：\n- 参数 = `None`  → 不动该字段（保留旧值）\n- 参数 = `Some(\"\")` → 清空（删除该字段）\n- 参数 = `Some(\"xxx\")` → 设值\n- 文件不存在时自动创建\n- 不修改 secrets.yaml；仅元数据",
+      "description": "注册或更新 secrets-meta.json 中某个 key 的元数据（expires_at / display_name）\n\n**Merge 语义**：\n- 参数 = `None`  → 不动该字段（保留旧值）\n- 参数 = `Some(\"\")` → 清空（删除该字段）\n- 参数 = `Some(\"xxx\")` → 设值\n\n- 文件不存在时自动创建\n- 不修改 secrets.yaml；仅元数据",
       "output_type": "Result<SetMetaResult, String>",
       "usage": {
         "summary": "旧非版本化写入已停用，使用 secrets_save",
@@ -29500,7 +29500,7 @@
       ],
       "source": "src-tauri/src/commands/shared_secrets.rs",
       "line": 105,
-      "description": "USER 在弹窗的决定 · 通过这个命令送达 IPC server 的等待中 oneshot\r\n\n`action`: `\"allow_once\"` / `\"allow_persistent\"` / `\"deny\"`",
+      "description": "USER 在弹窗的决定 · 通过这个命令送达 IPC server 的等待中 oneshot\n\n`action`: `\"allow_once\"` / `\"allow_persistent\"` / `\"deny\"`",
       "output_type": "Result<(), String>",
       "usage": {
         "summary": "授权弹窗由用户处理，CLI 不代替用户授予凭据权限",
@@ -29516,7 +29516,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/shared_secrets.rs",
       "line": 33,
-      "description": "IPC server 端点信息（前端可显示「监听中:51234」）\r\n\n文件不存在表示 server 未启动（理论不该发生 · setup 阶段就启）",
+      "description": "IPC server 端点信息（前端可显示「监听中:51234」）\n\n文件不存在表示 server 未启动（理论不该发生 · setup 阶段就启）",
       "output_type": "Result<Option<IpcEndpoint>, String>",
       "usage": {
         "summary": "不得向 AI 导出密钥服务的认证令牌",
@@ -29575,7 +29575,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/shared_secrets.rs",
       "line": 123,
-      "description": "打开 SOPS 编辑器（让 USER 直接编辑 yaml · 添加/删除 secret）\r\n\nWindows 下用 `cmd /C start` 让默认编辑器异步打开 · 不阻塞 HomeBase。\r\nSOPS 会调 $EDITOR · 默认 vim · USER 可设 `SOPS_EDITOR` 改成 notepad / VS Code。",
+      "description": "打开 SOPS 编辑器（让 USER 直接编辑 yaml · 添加/删除 secret）\n\nWindows 下用 `cmd /C start` 让默认编辑器异步打开 · 不阻塞 HomeBase。\nSOPS 会调 $EDITOR · 默认 vim · USER 可设 `SOPS_EDITOR` 改成 notepad / VS Code。",
       "output_type": "Result<String, String>",
       "usage": {
         "summary": "通过人工密钥管理入口操作",
@@ -29804,7 +29804,7 @@
       ],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 1355,
-      "description": "发送一条用户消息 · 调 Claude CLI 流式生成 assistant 回复\n**D2.2 范围**：\n- 单轮（不带历史 context）· 多轮 D2.6 实现\n- 不持久化（不写 jsonl）· D2.3 实现\n- 不接资料源（payload.source_paths 暂忽略）· D2.4 启用\n**流程**：\n1. 解析 payload（无 session_id 时新建一个）\n2. 构造 Claude prompt（system + user）\n3. spawn `claude -p <prompt>` · 流式 stdout\n4. 返回 task_id + session_id · 前端 listen(\"studio:event\") 接 stream",
+      "description": "发送一条用户消息 · 调 Claude CLI 流式生成 assistant 回复\n\n**D2.2 范围**：\n- 单轮（不带历史 context）· 多轮 D2.6 实现\n- 不持久化（不写 jsonl）· D2.3 实现\n- 不接资料源（payload.source_paths 暂忽略）· D2.4 启用\n\n**流程**：\n1. 解析 payload（无 session_id 时新建一个）\n2. 构造 Claude prompt（system + user）\n3. spawn `claude -p <prompt>` · 流式 stdout\n4. 返回 task_id + session_id · 前端 listen(\"studio:event\") 接 stream",
       "output_type": "Result<StudioChatSendResult, String>",
       "input_schema": {
         "type": "object",
@@ -29857,7 +29857,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 1534,
-      "description": "**E2.6**：列出当前所有 in-progress 生图任务（按 started_at_ms 倒序 · 最新在前）\n只读查询；过期进度显式标为未知，不删除现有进度文件。",
+      "description": "**E2.6**：列出当前所有 in-progress 生图任务（按 started_at_ms 倒序 · 最新在前）\n\n只读查询；过期进度显式标为未知，不删除现有进度文件。",
       "output_type": "Result<Vec<ImageProgress>, String>",
       "input_schema": {
         "type": "object",
@@ -29903,7 +29903,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 603,
-      "description": "列出所有 Studio 会话 · 按最后活动时间降序\n扫描路径：`<vault>/_raw/studio-*.chat.jsonl`\n- 不存在 → 返回空 Vec（不是错误）\n- 解析失败的文件 → 明确报错，不返回不完整的列表\n- 按 `updated_ms` 降序（最新在前）",
+      "description": "列出所有 Studio 会话 · 按最后活动时间降序\n\n扫描路径：`<vault>/_raw/studio-*.chat.jsonl`\n- 不存在 → 返回空 Vec（不是错误）\n- 解析失败的文件 → 明确报错，不返回不完整的列表\n- 按 `updated_ms` 降序（最新在前）",
       "output_type": "Result<Vec<StudioSessionMeta>, String>",
       "input_schema": {
         "type": "object",
@@ -30026,7 +30026,7 @@
       ],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 1409,
-      "description": "**D2.7**：append 一条 ChatMessage 到 session 的 jsonl\n前端在两个时机调：\n1. 用户发送后立即写 user message（保证即使 spawn 失败也有记录）\n2. 任务 completed 后写 assistant message（含 parts + stats）",
+      "description": "**D2.7**：append 一条 ChatMessage 到 session 的 jsonl\n\n前端在两个时机调：\n1. 用户发送后立即写 user message（保证即使 spawn 失败也有记录）\n2. 任务 completed 后写 assistant message（含 parts + stats）",
       "output_type": "Result<(), String>",
       "input_schema": {
         "type": "object",
@@ -30094,7 +30094,7 @@
       ],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 1426,
-      "description": "**E2**：读 attachments/ 下的图片文件 · 返回 base64 data URL（前端 img src 用）\n安全：path 必须在 `<vault>/_raw/attachments/` 下 · 否则拒绝",
+      "description": "**E2**：读 attachments/ 下的图片文件 · 返回 base64 data URL（前端 img src 用）\n\n安全：path 必须在 `<vault>/_raw/attachments/` 下 · 否则拒绝",
       "output_type": "Result<String, String>",
       "input_schema": {
         "type": "object",
@@ -30167,7 +30167,7 @@
       ],
       "source": "src-tauri/src/commands/studio.rs",
       "line": 1600,
-      "description": "**E1**：一键撚回 AI 改动 · unzip checkpoint + truncate jsonl\n参数：\n- `session_id`：当前会话 id\n- `task_id`：= user message 的 checkpoint_id\n- `cutoff_ts`：= user message 的 ts（该条及之后全删）\n返回：截断后剩余的 messages（前端直接 setMessages 替换）\n流程：\n1. unzip `<task_id>.zip` 覆盖 `_raw/`（排除 attachments + .studio-checkpoints）\n2. 重写 jsonl · 只保留 ts < cutoff_ts 的行\n3. 重新读 jsonl 返回",
+      "description": "**E1**：一键撚回 AI 改动 · unzip checkpoint + truncate jsonl\n\n参数：\n- `session_id`：当前会话 id\n- `task_id`：= user message 的 checkpoint_id\n- `cutoff_ts`：= user message 的 ts（该条及之后全删）\n\n返回：截断后剩余的 messages（前端直接 setMessages 替换）\n\n流程：\n1. unzip `<task_id>.zip` 覆盖 `_raw/`（排除 attachments + .studio-checkpoints）\n2. 重写 jsonl · 只保留 ts < cutoff_ts 的行\n3. 重新读 jsonl 返回",
       "output_type": "Result<Vec<ChatMessage>, String>",
       "input_schema": {
         "type": "object",
@@ -30349,7 +30349,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/system.rs",
       "line": 447,
-      "description": "CPU + RAM 实时指标\n注意：sysinfo 的 CPU 利用率必须 refresh 两次（间隔 ~200ms）才有效。\n第一次 refresh 拿基线，sleep 后第二次 refresh 计算差值。",
+      "description": "CPU + RAM 实时指标\n\n注意：sysinfo 的 CPU 利用率必须 refresh 两次（间隔 ~200ms）才有效。\n第一次 refresh 拿基线，sleep 后第二次 refresh 计算差值。",
       "output_type": "Result<SystemMetrics, String>",
       "input_schema": {
         "type": "object",
@@ -30432,7 +30432,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/system.rs",
       "line": 830,
-      "description": "启动自检 · 返回 5 项状态（不 short-circuit，每项独立返回）\n前端在 App 启动时调一次，把失败项渲染成顶部横幅。\n本命令不抛错（永远返回 Ok），让前端根据 `ok` + `severity` 自行分类展示。",
+      "description": "启动自检 · 返回 5 项状态（不 short-circuit，每项独立返回）\n\n前端在 App 启动时调一次，把失败项渲染成顶部横幅。\n本命令不抛错（永远返回 Ok），让前端根据 `ok` + `severity` 自行分类展示。",
       "output_type": "Result<Vec<PreflightCheck>, String>",
       "input_schema": {
         "type": "object",
@@ -30642,7 +30642,7 @@
       ],
       "source": "src-tauri/src/commands/topology.rs",
       "line": 365,
-      "description": "列出某绝对路径下的子条目（仅一级）\r\n\n返回：\r\n- 所有子目录（隐藏 / 系统目录除外）\r\n- 顶级关键 markdown（INDEX.md / README.md / AGENTS.md / log.md / index.md）\r\n\n子目录在前，按字母序",
+      "description": "列出某绝对路径下的子条目（仅一级）\n\n返回：\n- 所有子目录（隐藏 / 系统目录除外）\n- 顶级关键 markdown（INDEX.md / README.md / AGENTS.md / log.md / index.md）\n\n子目录在前，按字母序",
       "output_type": "Result<Vec<DirEntry>, String>",
       "input_schema": {
         "type": "object",
@@ -30800,7 +30800,7 @@
       ],
       "source": "src-tauri/src/commands/topology.rs",
       "line": 460,
-      "description": "解析某目录下的 INDEX.md / README.md frontmatter `references:`\r\n\n找 INDEX.md / index.md / README.md / AGENTS.md 任意一个，提取 references 数组",
+      "description": "解析某目录下的 INDEX.md / README.md frontmatter `references:`\n\n找 INDEX.md / index.md / README.md / AGENTS.md 任意一个，提取 references 数组",
       "output_type": "Result<Vec<RefEdge>, String>",
       "input_schema": {
         "type": "object",
@@ -31545,7 +31545,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/wiki.rs",
       "line": 126,
-      "description": "递归列出 C:\\HomeBase\\Wiki 下所有**目录**（含空目录）的相对路径\n用于前端 LLM Wiki sidebar 的目录树：`wiki_list` 只返回有 markdown 的目录，\n空骨架目录（如刚初始化的 `wiki/notes/llm/`）不会出现。本命令补上这缺口。\n**排除**：`.obsidian/` `.git/` `.trash/` `node_modules/` 子树\n返回 POSIX 风格相对路径数组，按字母序排序",
+      "description": "递归列出 C:\\HomeBase\\Wiki 下所有**目录**（含空目录）的相对路径\n\n用于前端 LLM Wiki sidebar 的目录树：`wiki_list` 只返回有 markdown 的目录，\n空骨架目录（如刚初始化的 `wiki/notes/llm/`）不会出现。本命令补上这缺口。\n\n**排除**：`.obsidian/` `.git/` `.trash/` `node_modules/` 子树\n\n返回 POSIX 风格相对路径数组，按字母序排序",
       "output_type": "Result<Vec<String>, String>",
       "input_schema": {
         "type": "object",
@@ -31589,7 +31589,7 @@
       "parameters": [],
       "source": "src-tauri/src/commands/wiki.rs",
       "line": 102,
-      "description": "递归扫描 C:\\HomeBase\\Wiki，列出所有 .md / .markdown / .txt\n**排除**：`.obsidian/` `.git/` 子树（噪音）\n软失败：扫描错误返回空列表 + warning 日志（前端显示「未读取到」）",
+      "description": "递归扫描 C:\\HomeBase\\Wiki，列出所有 .md / .markdown / .txt\n\n**排除**：`.obsidian/` `.git/` 子树（噪音）\n\n软失败：扫描错误返回空列表 + warning 日志（前端显示「未读取到」）",
       "output_type": "Result<Vec<WikiDoc>, String>",
       "input_schema": {
         "type": "object",
@@ -31641,7 +31641,7 @@
       ],
       "source": "src-tauri/src/commands/wiki.rs",
       "line": 144,
-      "description": "读取单篇 wiki 文档\n**安全**：rel_path 必须能解析到 C:\\HomeBase\\Wiki 子树内（防 `../` 越权）",
+      "description": "读取单篇 wiki 文档\n\n**安全**：rel_path 必须能解析到 C:\\HomeBase\\Wiki 子树内（防 `../` 越权）",
       "output_type": "Result<WikiContent, String>",
       "input_schema": {
         "type": "object",
