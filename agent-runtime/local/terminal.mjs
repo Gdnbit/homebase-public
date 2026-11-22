@@ -39,7 +39,16 @@ export async function runTerminal(context,request,{signal,onEvent=()=>{}}={}) {
   if(!Number.isInteger(timeout)||timeout<100||timeout>300000)fail('TIMEOUT_INVALID','终端超时须为100至300000毫秒');
   const root=await workspace(context,request.workspace_id,request.write!==false);
   const cwd=normalizeRelative(request.cwd||'').join('/');
-  const actualHash=crypto.createHash('sha256').update(await fs.readFile(backend.executable)).digest('hex');
+  let sandboxBytes;
+  try {
+    sandboxBytes=await fs.readFile(backend.executable);
+  } catch (error) {
+    if (error.code==='ENOENT'||error.code==='ENOTDIR') {
+      fail('SANDBOX_UNAVAILABLE','运行时缺少隔离执行器，请修复或重新安装 HomeBase 后再试');
+    }
+    throw error;
+  }
+  const actualHash=crypto.createHash('sha256').update(sandboxBytes).digest('hex');
   if(actualHash!==backend.sha256)fail('SANDBOX_CHANGED','隔离执行器文件与已核验指纹不一致，未运行');
   const masks=await masksFor(root.path);
   const environment=Object.fromEntries(['SystemRoot','WINDIR','COMSPEC','PATH','PATHEXT'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));

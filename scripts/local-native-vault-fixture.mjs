@@ -3,14 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-export function createSyntheticVault(lab) {
+export function createSyntheticVault(lab, {toolDirectory, inheritedEnv = process.env} = {}) {
   assert(path.resolve(lab).replaceAll('\\','/').startsWith('F:/HomeBase-Labs/'));
   const vault=path.join(lab,'secrets.yaml'), meta=path.join(lab,'secrets-meta.json');
   assert(!fs.existsSync(vault));
   const identity=path.join(lab,'.age-keys/primary.txt');fs.mkdirSync(path.dirname(identity),{recursive:true});
-  const env={...process.env,HOME:lab,USERPROFILE:lab,XDG_CONFIG_HOME:path.join(lab,'.config'),SOPS_AGE_KEY_FILE:identity,HOMEBASE_SOPS_AGE_KEY_FILE:identity};
+  const env={...inheritedEnv,HOME:lab,USERPROFILE:lab,XDG_CONFIG_HOME:path.join(lab,'.config'),SOPS_DISABLE_VERSION_CHECK:'true',SOPS_AGE_KEY_FILE:identity,HOMEBASE_SOPS_AGE_KEY_FILE:identity};
   for(const key of Object.keys(env)) if(/(?:SOPS|HOMEBASE_SOPS)_AGE_(?:KEY|KEY_CMD|SSH_PRIVATE_KEY_FILE|SSH_PRIVATE_KEY_CMD)$/.test(key))delete env[key];
-  const age='C:/HomeBase/Tools/age/age-keygen.exe',sops='C:/HomeBase/Tools/sops/bin/sops.exe';
+  const age=toolDirectory ? path.join(toolDirectory,'age-keygen.exe') : 'C:/HomeBase/Tools/age/age-keygen.exe';
+  const sops=toolDirectory ? path.join(toolDirectory,'sops.exe') : 'C:/HomeBase/Tools/sops/bin/sops.exe';
   function run(exe,args){const r=spawnSync(exe,args,{env,encoding:'utf8',windowsHide:true,timeout:60000});assert.equal(r.status,0,`Synthetic ${path.basename(exe)} fixture failed: ${r.error?.code||r.signal||r.status}`);return r.stdout;}
   run(age,['-o',identity]);const recipient=run(age,['-y',identity]).trim();assert.match(recipient,/^age1[a-z0-9]+$/);
   const config=path.join(lab,'.sops.yaml');fs.writeFileSync(config,`creation_rules:\n  - path_regex: .*\n    age: ${recipient}\n`);
@@ -24,5 +25,5 @@ export function createSyntheticVault(lab) {
     fs.writeFileSync(plain,JSON.stringify({...values,fixture_token:value}));
     fs.writeFileSync(vault,run(sops,['--config',config,'--encrypt','--age',recipient,'--input-type','json','--output-type','yaml',plain]));
   }
-  return {env:{...env,HOMEBASE_SECRETS_FILE:vault,HOMEBASE_SECRETS_META:meta,HOMEBASE_SOPS_CONFIG:config,HOMEBASE_SOPS_EXE:sops},values,rotateToken};
+  return {env:{...env,HOMEBASE_SECRETS_FILE:vault,HOMEBASE_SECRETS_META:meta,HOMEBASE_SOPS_CONFIG:config,HOMEBASE_SOPS_EXE:sops,...(toolDirectory?{HOMEBASE_AGE_KEYGEN:age}:{})},values,rotateToken};
 }

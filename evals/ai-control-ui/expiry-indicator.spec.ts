@@ -56,7 +56,7 @@ test("expired keys use a quiet dot; details appear only on demand without extra 
   await expect(trigger).toBeFocused();
   await expect(page.getByTestId("secret-reminder-dot")).toBeVisible();
   await trigger.click();
-  await page.getByRole("heading", { name: "HomeBase", exact: true }).click();
+  await page.getByRole("img", { name: "HomeBase", exact: true }).click();
   await expect(panel).toHaveCount(0);
   expect(
     await page.evaluate(

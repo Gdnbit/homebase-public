@@ -8,7 +8,7 @@
 
 下载前，宿主用固定的发布摘要核对随包 bubblewrap。WSL 监督进程再核对一次摘要，使用与仓库执行相同的基础隔离参数运行 `node --version`。隔离命名空间成功启动且其中的 Node.js 达到 20 后，才允许安装。预检不挂载仓库资料，也不运行仓库代码。摘要不符返回 `SANDBOX_CHANGED`，Node 不可用或版本过低返回 `SANDBOX_RUNTIME_UNAVAILABLE`，隔离启动失败返回 `SANDBOX_ISOLATION_UNAVAILABLE`。 [Bubblewrap 隔离参数](https://github.com/containers/bubblewrap#sandboxing)
 
-WSL 监督进程启动超时返回 `SANDBOX_NOT_READY`。提前退出、失配的就绪信息和已知 Windows 启动错误各有明确诊断。仅报告已识别的原因，原始进程输出留在本机进程内。 [WSL 命令说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands) · [Microsoft WSL 错误代码实现](https://github.com/microsoft/WSL/blob/master/src/windows/common/wslutil.cpp) · [WSL 故障排查](https://learn.microsoft.com/en-us/windows/wsl/troubleshooting-guide)
+WSL 监督进程最多等待 30 秒就绪，超时返回 `SANDBOX_NOT_READY`。能力运行的时限从就绪后开始计算。提前退出、失配的就绪信息和已知 Windows 启动错误各有明确诊断。仅报告已识别的原因，原始进程输出留在本机进程内。 [WSL 命令说明](https://learn.microsoft.com/en-us/windows/wsl/basic-commands) · [Microsoft WSL 错误代码实现](https://github.com/microsoft/WSL/blob/master/src/windows/common/wslutil.cpp) · [WSL 故障排查](https://learn.microsoft.com/en-us/windows/wsl/troubleshooting-guide)
 
 预检失败时保留原分析版本，未创建安装尝试、业务安装回执或能力登记。下载后的验收阶段若启动下一轮隔离进程失败，显示原项目验收未完成。若隔离请求已经发出但没有可信终态，则保留 `EXECUTION_UNKNOWN`，按原任务核对。桌面和微信显示对应原因。
 

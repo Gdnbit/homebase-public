@@ -227,30 +227,17 @@ fn constant_eq(left: &[u8], right: &[u8]) -> bool {
 }
 
 #[cfg(windows)]
-fn protect_for_current_user(path: &Path, directory: bool) -> Result<(), ControlError> {
+fn current_user_info() -> Result<Vec<usize>, ControlError> {
     use std::{
-        os::windows::{
-            ffi::OsStrExt,
-            io::{AsRawHandle, FromRawHandle, OwnedHandle},
-        },
-        ptr::{null, null_mut},
+        os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
+        ptr::null_mut,
     };
     use windows_sys::Win32::{
-        Foundation::{LocalFree, ERROR_SUCCESS},
-        Security::{
-            Authorization::{
-                SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, NO_MULTIPLE_TRUSTEE,
-                SET_ACCESS, SE_FILE_OBJECT, TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
-            },
-            GetTokenInformation, TokenUser, CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION,
-            OBJECT_INHERIT_ACE, PROTECTED_DACL_SECURITY_INFORMATION, TOKEN_QUERY, TOKEN_USER,
-        },
-        Storage::FileSystem::FILE_ALL_ACCESS,
+        Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER},
         System::Threading::{GetCurrentProcess, OpenProcessToken},
     };
 
     let user_error = || ControlError::new("STATE_ACL", "无法识别本机用户");
-    let acl_error = || ControlError::new("STATE_ACL", "无法保护私有文件或目录");
     let mut token = null_mut();
     if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
         return Err(user_error());
@@ -270,7 +257,30 @@ fn protect_for_current_user(path: &Path, directory: bool) -> Result<(), ControlE
     if read == 0 {
         return Err(user_error());
     }
+    Ok(buffer)
+}
 
+#[cfg(windows)]
+fn protect_for_current_user(path: &Path, directory: bool) -> Result<(), ControlError> {
+    use std::{
+        os::windows::ffi::OsStrExt,
+        ptr::{null, null_mut},
+    };
+    use windows_sys::Win32::{
+        Foundation::{LocalFree, ERROR_SUCCESS},
+        Security::{
+            Authorization::{
+                SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, NO_MULTIPLE_TRUSTEE,
+                SET_ACCESS, SE_FILE_OBJECT, TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
+            },
+            CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE,
+            PROTECTED_DACL_SECURITY_INFORMATION, TOKEN_USER,
+        },
+        Storage::FileSystem::FILE_ALL_ACCESS,
+    };
+    let user_info = current_user_info()?;
+    let user = user_info.as_ptr().cast::<TOKEN_USER>();
+    let acl_error = || ControlError::new("STATE_ACL", "无法保护私有文件或目录");
     let wide: Vec<_> = std::fs::canonicalize(path)
         .map_err(|_| acl_error())?
         .as_os_str()
@@ -430,56 +440,67 @@ mod private_path_tests {
         directory
     }
 
-    async fn assert_owner_only(path: &Path, audit: &Path) {
-        let output = tokio::process::Command::new("whoami.exe")
-            .args(["/user", "/fo", "csv", "/nh"])
-            .creation_flags(0x08000000)
-            .output()
-            .await
-            .unwrap();
-        assert!(output.status.success());
-        let user = String::from_utf8_lossy(&output.stdout);
-        let sid = user
-            .split('"')
-            .find(|part| part.starts_with("S-1-"))
-            .unwrap();
-        let output = tokio::process::Command::new("icacls.exe")
-            .arg(std::fs::canonicalize(path).unwrap())
-            .arg("/save")
-            .arg(audit)
-            .arg("/Q")
-            .creation_flags(0x08000000)
-            .output()
-            .await
-            .unwrap();
-        assert!(output.status.success(), "Could not inspect synthetic ACL");
-        let bytes = std::fs::read(audit).unwrap();
-        let saved = if bytes.starts_with(&[0xff, 0xfe])
-            || bytes.windows(4).any(|part| part == [b'D', 0, b':', 0])
-        {
-            let start = if bytes.starts_with(&[0xff, 0xfe]) {
-                2
-            } else {
-                0
-            };
-            let words: Vec<_> = bytes[start..]
-                .chunks_exact(2)
-                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-                .collect();
-            String::from_utf16(&words).unwrap()
-        } else {
-            String::from_utf8(bytes).unwrap()
+    fn assert_owner_only(path: &Path) {
+        use std::ptr::{addr_of, null_mut};
+        use windows_sys::Win32::{
+            Foundation::{LocalFree, ERROR_SUCCESS},
+            Security::{
+                Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT},
+                EqualSid, GetAce, GetSecurityDescriptorControl, ACCESS_ALLOWED_ACE, ACE_HEADER,
+                DACL_SECURITY_INFORMATION, SE_DACL_PROTECTED, TOKEN_USER,
+            },
+            Storage::FileSystem::FILE_ALL_ACCESS,
         };
-        let dacl = saved.lines().find(|line| line.starts_with("D:")).unwrap();
-        assert!(dacl.contains("P"), "Inheritance must remain disabled");
-        assert_eq!(
-            dacl.matches("(A;").count(),
-            1,
-            "Only the current owner is granted access"
-        );
-        assert!(dacl.contains(sid));
-        assert!(dacl.contains(";FA;"), "The owner must retain full access");
-        assert!(!dacl.contains("(D;"));
+        let wide: Vec<_> = std::fs::canonicalize(path)
+            .unwrap()
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let user_info = current_user_info().unwrap();
+        let user = user_info.as_ptr().cast::<TOKEN_USER>();
+        let mut dacl = null_mut();
+        let mut descriptor = null_mut();
+        let status = unsafe {
+            GetNamedSecurityInfoW(
+                wide.as_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                null_mut(),
+                null_mut(),
+                &mut dacl,
+                null_mut(),
+                &mut descriptor,
+            )
+        };
+        assert_eq!(status, ERROR_SUCCESS, "Could not inspect synthetic ACL");
+        let mut control = 0;
+        let mut revision = 0;
+        let mut ace = null_mut();
+        let (protected, user_only) = unsafe {
+            let protected = GetSecurityDescriptorControl(descriptor, &mut control, &mut revision)
+                != 0
+                && control & SE_DACL_PROTECTED != 0;
+            let user_only =
+                !dacl.is_null() && (*dacl).AceCount == 1 && GetAce(dacl, 0, &mut ace) != 0 && {
+                    let header = &*ace.cast::<ACE_HEADER>();
+                    const ACCESS_ALLOWED: u8 = 0;
+                    header.AceType == ACCESS_ALLOWED
+                        && usize::from(header.AceSize) >= std::mem::size_of::<ACCESS_ALLOWED_ACE>()
+                        && {
+                            let allow = &*ace.cast::<ACCESS_ALLOWED_ACE>();
+                            allow.Mask == FILE_ALL_ACCESS
+                                && EqualSid(
+                                    addr_of!(allow.SidStart).cast_mut().cast(),
+                                    (*user).User.Sid,
+                                ) != 0
+                        }
+                };
+            LocalFree(descriptor.cast());
+            (protected, user_only)
+        };
+        assert!(protected, "Inheritance must remain disabled");
+        assert!(user_only, "Only the current user is granted full access");
     }
 
     #[tokio::test]
@@ -496,7 +517,7 @@ mod private_path_tests {
             .unwrap();
         assert_eq!(std::fs::read(&destination).unwrap(), b"synthetic-v2");
         assert_eq!(std::fs::read_dir(&parent).unwrap().count(), 1);
-        assert_owner_only(&destination, &root.path().join("file-acl.txt")).await;
+        assert_owner_only(&destination);
 
         let collision = parent.join("existing-directory");
         std::fs::create_dir(&collision).unwrap();
@@ -517,6 +538,6 @@ mod private_path_tests {
         let root = tempfile::tempdir().unwrap();
         let directory = long_directory(root.path());
         private_directory(&directory).await.unwrap();
-        assert_owner_only(&directory, &root.path().join("directory-acl.txt")).await;
+        assert_owner_only(&directory);
     }
 }

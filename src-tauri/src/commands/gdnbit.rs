@@ -1056,9 +1056,13 @@ mod tests {
         assert_eq!(cfg.node_path, "node");
         assert!(cfg.script_path.ends_with("obsidian-sync.mjs"));
         assert!(cfg.publish_kit_path.ends_with("publish.mjs"));
-        // Phase C 增强：默认 prod，不再是 localhost
-        assert_eq!(cfg.api_url, "https://example.invalid");
-        assert_eq!(cfg.vault_path, r"C:\HomeBase\Wiki");
+        if let Some(home) = crate::legacy_isolation::test_path("") {
+            assert_eq!(cfg.api_url, "http://127.0.0.1:9");
+            assert_eq!(PathBuf::from(cfg.vault_path), home.join("Wiki"));
+        } else {
+            assert_eq!(cfg.api_url, "https://example.invalid");
+            assert_eq!(cfg.vault_path, r"C:\HomeBase\Wiki");
+        }
         assert_eq!(cfg.default_status, "draft");
         assert!(cfg.api_key.is_none());
     }

@@ -7,7 +7,7 @@
 | 目标 | 入口 |
 | --- | --- |
 | 查当前命令、入参与授权 | [AI 启动](../control/START.md) · [生成的契约](../control/reference.md) |
-| 检查前端、依赖和源码构建 | [开发与验证](../README.md#验证与文档) |
+| 检查前端、依赖和源码构建 | [快速开始](../README.md#快速开始) · [开发与验证](ai-control.md#开发与验证) |
 | 检查任务进度及恢复 | [助理任务工作流](assistant-task-workflow.md) · [原任务身份](assistant-job-identity.md) |
 | 验证 ASR 工作区和结果 | [ASR 验收](specs/asr-control-plane/acceptance.md) · [历史验证记录](verification-progress.md) |
 | 检查凭据引用与轮换 | [密钥生命周期](secret-lifecycle.md) |
@@ -21,6 +21,10 @@
 - 控制服务回执记录任务身份和外层状态；验证文件时检查业务状态及产物。
 - 桌面和模拟微信复用会话或任务标识，统计原动作执行与回复次数。
 - 需要真实授权的联调单独列为实机验证。构建、模拟协议和真实设备验收分别记账。
+
+原生助理探针可用 `node scripts/test-assistant-native.mjs` 运行。把 `HOMEBASE_ASSISTANT_NATIVE_LAB` 指向测试目录，`HOMEBASE_ASSISTANT_NATIVE_BIN` 指向候选 Windows 可执行文件。候选旁须有这次构建的 `distribution`（Pi、SOPS、age 和密钥助手），终端场景需要随包隔离执行器和 Ubuntu WSL。每次运行创建新的应用数据、合成密钥库与测试会话，验证重复请求、提醒、记忆和重启恢复。
+
+在 `F:/HomeBase-Labs/` 下用同一候选和 `node scripts/test-assistant-local-native.mjs` 验证本机文件及导出、stdio 和 HTTP MCP、Skill、合成凭据轮换以及中断后的任务状态。
 
 ## 中断和有副作用的动作
 

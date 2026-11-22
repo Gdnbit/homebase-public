@@ -42,6 +42,12 @@ jobs:
       - name: Build frontend (Vite)
         run: npm run build
 
+      - name: Test synthetic desktop workflows
+        run: npm run test:control:ui -- ai-first.spec.ts performance.spec.ts preflight.spec.ts entry.spec.ts expiry-indicator.spec.ts updates.spec.ts
+
+      - name: Test isolated attachments, handoff and capability provisioning
+        run: node --test scripts/test-workflow-handoff.mjs scripts/test-repo-capabilities.mjs scripts/test-repo-capability-evidence.mjs
+
   rust-backend:
     name: Rust Backend (Tauri 2)
     runs-on: windows-latest
@@ -92,8 +98,13 @@ jobs:
 
       - name: cargo test
         run: |
-          $env:HOMEBASE_TEST_HOME = Join-Path $env:RUNNER_TEMP 'homebase-test'
-          New-Item -ItemType Directory -Force $env:HOMEBASE_TEST_HOME | Out-Null
+          $testProfile = Join-Path $env:RUNNER_TEMP ('homebase-test-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $testProfile | Out-Null
+          $env:HOMEBASE_TEST_HOME = $testProfile
+          $env:TMP = $testProfile
+          $env:TEMP = $testProfile
+          $env:TMPDIR = $testProfile
+          $env:SystemTemp = $testProfile
           cargo test --locked --manifest-path src-tauri/Cargo.toml --all-features -- --test-threads=1
 
   tauri-build:

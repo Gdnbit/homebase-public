@@ -664,7 +664,12 @@ test("Wiki AI optimization completion updates the open preview without manual re
 test("system and secret read errors recover through their own retry controls", async ({
   page,
 }) => {
-  await page.evaluate(async () => {
+  const systemReads = [
+    ["磁盘容量", "刷新磁盘容量", "读取磁盘信息失败"],
+    ["PATH 项目", "刷新 PATH 项目", "读取 PATH 失败"],
+    ["关键进程", "刷新关键进程", "读取进程列表失败"],
+  ];
+  await page.evaluate(() => {
     const f = (window as any).__performance;
     for (const command of [
       "system_disks",
@@ -675,16 +680,15 @@ test("system and secret read errors recover through their own retry controls", a
       f.values[command] = () => {
         throw Error("Synthetic read unavailable");
       };
-    await f.client.invalidateQueries({ queryKey: ["system", "disks"] });
-    await f.client.invalidateQueries({ queryKey: ["secrets", "list"] });
+    f.client.removeQueries({ queryKey: ["system"] });
+    f.client.removeQueries({ queryKey: ["secrets", "list"] });
   });
   await go(page, "系统");
-  for (const label of ["磁盘容量", "PATH 项目", "关键进程"])
-    await expect(
-      page
-        .getByRole("region", { name: label })
-        .getByRole("button", { name: "重试", exact: true }),
-    ).toBeVisible();
+  for (const [label, refresh, error] of systemReads) {
+    const section = page.getByRole("region", { name: label });
+    await expect(section.getByText(error, { exact: true })).toBeVisible();
+    await expect(section.getByRole("button", { name: refresh, exact: true })).toBeEnabled();
+  }
   await page.evaluate(() => {
     const { values } = (window as any).__performance;
     values.system_disks = [
@@ -717,11 +721,14 @@ test("system and secret read errors recover through their own retry controls", a
       },
     ];
   });
-  for (const label of ["磁盘容量", "PATH 项目", "关键进程"])
+  for (const [label, refresh] of systemReads)
     await page
       .getByRole("region", { name: label })
-      .getByRole("button", { name: "重试", exact: true })
+      .getByRole("button", { name: refresh, exact: true })
       .click();
+  await expect(
+    page.getByRole("region", { name: "磁盘容量" }).getByRole("heading", { name: "X", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("SyntheticPath", { exact: true })).toBeVisible();
   await expect(
     page.getByText("Synthetic process", { exact: true }),

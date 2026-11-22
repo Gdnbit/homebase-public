@@ -25,7 +25,7 @@ function trustedSandbox(context) {
 }
 
 function sandboxProcess(config, workRoot, request, {
-  signal, onSpawn = () => {}, launch = spawn, startupTimeout = 12000
+  signal, onSpawn = () => {}, launch = spawn, startupTimeout = 30_000
 } = {}) {
   const error = (code, message) => Object.assign(new Error(message), { code, homebase: true });
   const unavailable = () => error('SANDBOX_NOT_READY', '等待 WSL 隔离进程就绪超时，未提交仓库代码。请核对 Linux 发行版能否启动。');

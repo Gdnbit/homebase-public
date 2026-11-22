@@ -27,7 +27,7 @@ export async function readTextAttachments(
     check();
     if (!/\.(txt|md|markdown|csv|json|log|yaml|yml|tsv)$/i.test(file.name))
       throw Error(
-        `“${file.name}”暂不支持。可添加文本、Markdown、CSV、JSON、日志、YAML 或 PDF；图片尚未适配。`,
+        `“${file.name}”暂不支持。可添加文本文件、PDF 或 PNG。`,
       );
     if (file.size === 0 || file.size > 16 * 1024)
       throw Error(`“${file.name}”须为非空文本，且不超过 16 KiB。`);

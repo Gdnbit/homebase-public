@@ -401,14 +401,44 @@ function delayedFile(name, bytes) {
   };
 }
 
-test("late file reads merge current attachments and never restore a removed attachment", async () => {
+function useSyntheticFileReader(t) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "FileReader");
+  Object.defineProperty(globalThis, "FileReader", {
+    configurable: true,
+    value: class {
+      aborted = false;
+      readAsArrayBuffer(file) {
+        void file.arrayBuffer().then((buffer) => {
+          if (this.aborted) return;
+          this.result = buffer;
+          this.onload();
+        }, (error) => {
+          if (this.aborted) return;
+          this.error = error;
+          this.onerror();
+        });
+      }
+      abort() {
+        this.aborted = true;
+        this.onabort();
+      }
+    },
+  });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, "FileReader", original);
+    else delete globalThis.FileReader;
+  });
+}
+
+test("late file reads merge current attachments and never restore a removed attachment", async (t) => {
+  useSyntheticFileReader(t);
   const f = fixture(),
     api = await load(f);
   seed(f, "new", "original text");
   await api.ensureDraft(null);
   api.updateDraft(null, { files: [{ name: "removed.md", content: "old" }] });
   const slow = delayedFile("new.md", Buffer.from("合成附件🙂"));
-  const reading = api.readTextAttachments([slow.file], () => {});
+  const reading = api.readTextAttachments([slow.file], new AbortController().signal, () => {});
   api.updateDraft(null, {
     text: "newer text",
     route: "newer-route",
@@ -426,12 +456,13 @@ test("late file reads merge current attachments and never restore a removed atta
   assert.equal(f.get("new").body.files[1].content, "合成附件🙂");
 });
 
-test("attachment capacity is checked against the latest draft and fails without losing it", async () => {
+test("attachment capacity is checked against the latest draft and fails without losing it", async (t) => {
+  useSyntheticFileReader(t);
   const f = fixture(),
     api = await load(f);
   await api.ensureDraft(null);
   const slow = delayedFile("late.md", Buffer.from("late"));
-  const reading = api.readTextAttachments([slow.file], () => {});
+  const reading = api.readTextAttachments([slow.file], new AbortController().signal, () => {});
   api.updateDraft(null, {
     files: Array.from({ length: 4 }, (_, i) => ({
       name: `${i}.md`,
@@ -456,14 +487,15 @@ test("attachment capacity is checked against the latest draft and fails without 
   await api.flushDraft(null);
 });
 
-test("cancelled file preparation stops before later files and never mutates the draft", async () => {
+test("cancelled file preparation stops before later files and never mutates the draft", async (t) => {
+  useSyntheticFileReader(t);
   const f = fixture(),
     api = await load(f);
   seed(f, "new", "keep");
   await api.ensureDraft(null);
   const slow = delayedFile("late.md", Buffer.from("late"));
-  let active = true,
-    secondRead = false;
+  const read = new AbortController();
+  let secondRead = false;
   const reading = api.readTextAttachments(
     [
       slow.file,
@@ -476,60 +508,62 @@ test("cancelled file preparation stops before later files and never mutates the 
         },
       },
     ],
-    () => {
-      if (!active) throw Error("cancelled");
-    },
+    read.signal,
+    () => read.signal.throwIfAborted(),
   );
-  active = false;
+  read.abort();
+  await assert.rejects(reading, { name: "AbortError" });
   slow.release();
-  await assert.rejects(reading, /cancelled/);
   assert.equal(secondRead, false);
   assert.deepEqual(api.readDraft(null).files, []);
   assert.equal(api.readDraft(null).text, "keep");
 });
 
-test("a pending request arriving during file preparation rejects the late attachment", async () => {
-  for (const extra of [
-    {
+test("a pending request arriving during file preparation rejects the late attachment", async (t) => {
+  useSyntheticFileReader(t);
+  for (const [session, extra] of [
+    [null, {
       pending: {
         state: "prepared",
         request: { request_id: "original", session_id: "new", text: "task" },
       },
-    },
-    {
+    }],
+    ["native:codex:original", {
       native_pending: {
         provider: "codex",
         thread_id: "original",
         text: "task",
         request_id: "original",
       },
-    },
+    }],
   ]) {
     const f = fixture(),
       api = await load(f);
-    seed(f, "new", "keep");
-    await api.ensureDraft(null);
+    const scope = session ?? "new";
+    seed(f, scope, "keep");
+    await api.ensureDraft(session);
     const slow = delayedFile("late.md", Buffer.from("late"));
-    const reading = api.readTextAttachments([slow.file], () => {});
-    seed(f, "new", "keep", extra);
-    await api.ensureDraft(null, true);
+    const reading = api.readTextAttachments([slow.file], new AbortController().signal, () => {});
+    seed(f, scope, "keep", extra);
+    await api.ensureDraft(session, true);
     slow.release();
     assert.throws(
       () =>
-        api.appendDraftFiles(null, [{ name: "ready.md", content: "ready" }]),
+        api.appendDraftFiles(session, [{ name: "ready.md", content: "ready" }]),
       /尚待核对/,
     );
     const added = await reading;
-    assert.throws(() => api.appendDraftFiles(null, added), /尚待核对/);
-    assert.deepEqual(api.readDraft(null).files, []);
+    assert.throws(() => api.appendDraftFiles(session, added), /尚待核对/);
+    assert.deepEqual(api.readDraft(session).files, []);
     assert.deepEqual(
-      f.get("new")[Object.keys(extra)[0]],
+      f.get(scope)[Object.keys(extra)[0]],
       extra[Object.keys(extra)[0]],
     );
   }
 });
 
-test("invalid UTF-8 or binary file rejects the whole prepared batch without partial append", async () => {
+test("invalid UTF-8 or binary file rejects the whole prepared batch without partial append", async (t) => {
+  useSyntheticFileReader(t);
   const api = await load(fixture());
   await api.ensureDraft(null);
   for (const invalid of [
@@ -542,10 +576,15 @@ test("invalid UTF-8 or binary file rejects the whole prepared batch without part
     good.release();
     bad.release();
     await assert.rejects(
-      api.readTextAttachments([good.file, bad.file], () => {}),
+      api.readTextAttachments([good.file, bad.file], new AbortController().signal, () => {}),
+      /encoding utf-8|不是可读取的文本/i,
     );
     assert.deepEqual(api.readDraft(null).files, []);
   }
+  await assert.rejects(
+    api.readTextAttachments([{ name: "unsupported.jpg", size: 1 }], new AbortController().signal, () => {}),
+    /可添加文本文件、PDF 或 PNG/,
+  );
 });
 
 test("PDF replacement preserves other current attachments and original document references", async () => {

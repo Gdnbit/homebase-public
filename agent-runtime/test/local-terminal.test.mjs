@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import {runTerminal} from '../local/terminal.mjs';
 const parent=process.env.HOMEBASE_LOCAL_TEST_LAB;
 const executable=process.env.HOMEBASE_BWRAP_EXE;
@@ -11,6 +12,14 @@ async function fixture(){
   await fs.mkdir(parent,{recursive:true});const root=await fs.mkdtemp(path.join(parent,'terminal-'));const working=path.join(root,'workspace');await fs.mkdir(working);
   return {root,working,context:{default_workspace:'fixture',protected_paths:[],workspaces:[{id:'fixture',path:working,access:'write'}],sandbox:{kind:'wsl-bubblewrap',executable,sha256:hash,distro:'Ubuntu'}}};
 }
+test('a missing bundled executor reports an unavailable sandbox',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'homebase-terminal-'));
+  t.after(()=>fs.rm(root,{recursive:true,force:true}));
+  const context={default_workspace:'fixture',workspaces:[{id:'fixture',path:root,access:'write'}],
+    sandbox:{kind:'wsl-bubblewrap',executable:path.join(root,'missing-bwrap'),sha256:'0'.repeat(64)}};
+  await assert.rejects(runTerminal(context,{command:'printf SYNTHETIC'}),
+    {code:'SANDBOX_UNAVAILABLE',message:/缺少隔离执行器/});
+});
 test('real WSL sandbox mounts only test workspace, masks credentials and isolates network',{skip:!enabled},async()=>{
   const f=await fixture();await fs.writeFile(path.join(f.working,'.env'),'SYNTHETIC NOT A REAL KEY');
   await fs.writeFile(path.join(f.root,'outside.txt'),'SYNTHETIC SENTINEL');

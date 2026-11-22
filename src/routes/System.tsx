@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Cpu,
+  RefreshCw,
   Route,
   Server,
   Wrench,
@@ -14,6 +15,44 @@ import { systemApi, type PathEntry, type ProcessInfo } from "@/lib/tauri-api";
 import { EmptyPlaceholder } from "@/components/empty-placeholder";
 import { GdnbitSettingsSection } from "@/components/gdnbit-settings-section";
 import { cn, formatRelativeTime } from "@/lib/utils";
+
+function SystemRefresh({
+  label,
+  updatedAt,
+  fetching,
+  refreshFailed,
+  onRefresh,
+}: {
+  label: string;
+  updatedAt: number;
+  fetching: boolean;
+  refreshFailed: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+      {refreshFailed && (
+        <span role="status" className="text-xs text-warning-strong">
+          更新失败，仍显示上次结果
+        </span>
+      )}
+      <span className="font-mono text-xs text-muted-foreground">
+        {updatedAt ? formatRelativeTime(updatedAt) : "未拉取"}
+      </span>
+      <button
+        type="button"
+        className="hb-btn-ghost p-1.5"
+        title={label}
+        aria-label={label}
+        aria-busy={fetching}
+        disabled={fetching}
+        onClick={onRefresh}
+      >
+        <RefreshCw className={cn("h-4 w-4", fetching && "motion-safe:animate-spin")} aria-hidden />
+      </button>
+    </div>
+  );
+}
 
 /**
  * 系统 — 磁盘 / PATH / 进程（v3 §6.6）
@@ -24,7 +63,9 @@ export function System() {
   const {
     data: disks = [],
     isLoading,
-    isError,
+    isLoadingError,
+    isRefetchError,
+    isFetching,
     error,
     refetch,
     dataUpdatedAt,
@@ -50,23 +91,21 @@ export function System() {
       <section aria-label="磁盘容量">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="font-serif text-lg font-semibold">磁盘容量</h2>
-          <span className="font-mono text-xs text-muted-foreground">
-            Get-PSDrive ·{" "}
-            {dataUpdatedAt ? formatRelativeTime(dataUpdatedAt) : "未拉取"}
-          </span>
+          <SystemRefresh
+            label="刷新磁盘容量"
+            updatedAt={dataUpdatedAt}
+            fetching={isFetching}
+            refreshFailed={isRefetchError}
+            onRefresh={() => void refetch({ cancelRefetch: false })}
+          />
         </div>
         {isLoading ? (
           <DisksSkeleton />
-        ) : isError ? (
+        ) : isLoadingError ? (
           <EmptyPlaceholder
             title="读取磁盘信息失败"
             description={String(error ?? "请检查 PowerShell 是否可用")}
             icon="💾"
-            action={
-              <button className="hb-btn-outline" onClick={() => refetch()}>
-                重试
-              </button>
-            }
           />
         ) : disks.length === 0 ? (
           <EmptyPlaceholder
@@ -184,7 +223,9 @@ function PathSection() {
   const {
     data: entries = [],
     isLoading,
-    isError,
+    isLoadingError,
+    isRefetchError,
+    isFetching,
     error,
     refetch,
     dataUpdatedAt,
@@ -207,7 +248,7 @@ function PathSection() {
         <h2 className="flex items-center gap-2 font-serif text-lg font-semibold">
           <Route className="h-4 w-4 text-primary-600 dark:text-primary-400" aria-hidden />
           PATH 项目
-          {!isLoading && !isError && entries.length > 0 && (
+          {!isLoading && !isLoadingError && entries.length > 0 && (
             <span className="font-mono text-xs font-normal text-muted-foreground">
               · {entries.length} 项 · {broken.length > 0 ? (
                 <span className="text-destructive">{broken.length} 死链</span>
@@ -217,23 +258,22 @@ function PathSection() {
             </span>
           )}
         </h2>
-        <span className="font-mono text-xs text-muted-foreground">
-          {dataUpdatedAt ? formatRelativeTime(dataUpdatedAt) : "未拉取"}
-        </span>
+        <SystemRefresh
+          label="刷新 PATH 项目"
+          updatedAt={dataUpdatedAt}
+          fetching={isFetching}
+          refreshFailed={isRefetchError}
+          onRefresh={() => void refetch({ cancelRefetch: false })}
+        />
       </div>
 
       {isLoading ? (
         <PathSkeleton />
-      ) : isError ? (
+      ) : isLoadingError ? (
         <EmptyPlaceholder
           title="读取 PATH 失败"
           description={String(error ?? "PowerShell 调用失败 · 检查执行策略")}
           icon="🛣️"
-          action={
-            <button className="hb-btn-outline" onClick={() => refetch()}>
-              重试
-            </button>
-          }
         />
       ) : entries.length === 0 ? (
         <EmptyPlaceholder
@@ -416,7 +456,9 @@ function ProcessesSection() {
   const {
     data: procs = [],
     isLoading,
-    isError,
+    isLoadingError,
+    isRefetchError,
+    isFetching,
     error,
     refetch,
     dataUpdatedAt,
@@ -432,29 +474,28 @@ function ProcessesSection() {
         <h2 className="flex items-center gap-2 font-serif text-lg font-semibold">
           <Cpu className="h-4 w-4 text-primary-600 dark:text-primary-400" aria-hidden />
           关键进程
-          {!isLoading && !isError && (
+          {!isLoading && !isLoadingError && (
             <span className="font-mono text-xs font-normal text-muted-foreground">
               · {procs.length} 个在跑
             </span>
           )}
         </h2>
-        <span className="font-mono text-xs text-muted-foreground">
-          sysinfo · {dataUpdatedAt ? formatRelativeTime(dataUpdatedAt) : "未拉取"}
-        </span>
+        <SystemRefresh
+          label="刷新关键进程"
+          updatedAt={dataUpdatedAt}
+          fetching={isFetching}
+          refreshFailed={isRefetchError}
+          onRefresh={() => void refetch({ cancelRefetch: false })}
+        />
       </div>
 
       {isLoading ? (
         <ProcessesSkeleton />
-      ) : isError ? (
+      ) : isLoadingError ? (
         <EmptyPlaceholder
           title="读取进程列表失败"
           description={String(error ?? "未知错误")}
           icon="⚙️"
-          action={
-            <button className="hb-btn-outline" onClick={() => refetch()}>
-              重试
-            </button>
-          }
         />
       ) : procs.length === 0 ? (
         <EmptyPlaceholder

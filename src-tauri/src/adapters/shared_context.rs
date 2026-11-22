@@ -301,7 +301,8 @@ pub(crate) mod tests {
         assert!(!vault.subpaths.is_empty());
 
         let web = ctx.locations.iter().find(|l| l.id == "gdnbit_web").unwrap();
-        assert!(web.path.contains("Gdnbit_Web"));
+        assert_eq!(web.path, r"C:\HomeBase\Site");
+        assert!(!web.subpaths.is_empty());
     }
 
     #[test]

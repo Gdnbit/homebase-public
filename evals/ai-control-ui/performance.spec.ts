@@ -213,6 +213,55 @@ test("all routes render; fresh reads survive navigation and unopened graph/list 
   ).toEqual([]);
 });
 
+test("system manual refresh shares an in-flight read and retains the last successful result", async ({ page }) => {
+  await page.evaluate(() => {
+    const fixture = (window as any).__performance;
+    fixture.values.system_path_list = [{
+      path: "X:/fixture/previous",
+      raw: "X:/fixture/previous",
+      exists: true,
+      source: "user",
+    }];
+  });
+  await navigate(page, "系统");
+  const section = page.getByRole("region", { name: "PATH 项目" });
+  const refresh = section.getByRole("button", { name: "刷新 PATH 项目", exact: true });
+  await expect(section.getByText("X:/fixture/previous", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "刷新磁盘容量", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "刷新关键进程", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    const fixture = (window as any).__performance;
+    fixture.values.system_path_list = () => new Promise((_resolve, reject) => {
+      fixture.failSystemPath = () => reject(new Error("合成 PATH 读取失败"));
+    });
+  });
+  const reads = () => page.evaluate(() => (window as any).__performance.calls
+    .filter((command: string) => command === "system_path_list").length);
+  await refresh.evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
+  await expect(refresh).toBeDisabled();
+  await expect.poll(reads).toBe(2);
+  await expect(section.getByText("X:/fixture/previous", { exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).__performance.failSystemPath());
+  await expect(section.getByRole("status")).toContainText("更新失败，仍显示上次结果");
+  await expect(section.getByText("X:/fixture/previous", { exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).__performance.values.system_path_list = [{
+      path: "X:/fixture/current",
+      raw: "X:/fixture/current",
+      exists: true,
+      source: "user",
+    }];
+  });
+  await refresh.click();
+  await expect(section.getByText("X:/fixture/current", { exact: true })).toBeVisible();
+  await expect(section.getByText("X:/fixture/previous", { exact: true })).toBeHidden();
+  await expect(section.getByRole("status")).toHaveCount(0);
+  expect(await reads()).toBe(3);
+});
+
 test("cache deduplicates reads, expires, invalidates after mutation, and never caches failed reads as success", async ({
   page,
 }) => {

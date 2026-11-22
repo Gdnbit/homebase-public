@@ -294,4 +294,15 @@ test('sandbox sends a request only after a matching readiness frame', {skip:proc
   completed.child.stdout.write('{"event":"complete","status":"succeeded","exit_code":0}\n');
   completed.child.emit('close',0);
   assert.equal((await response).stdout,'fixed result');
+
+  t.mock.timers.enable({apis:['setTimeout']});
+  const cold=fixture();
+  const coldResult=execute(cold);
+  t.mock.timers.tick(15_000);
+  assert.equal(cold.written(),'');
+  cold.ready();
+  assert.equal(JSON.parse(cold.written()).entry,entry);
+  cold.child.stdout.write('{"event":"complete","status":"succeeded","exit_code":0}\n');
+  cold.child.emit('close',0);
+  assert.equal((await coldResult).status,'succeeded');
 });

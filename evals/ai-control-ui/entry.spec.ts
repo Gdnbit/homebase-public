@@ -42,9 +42,10 @@ test("copy writes the exact shared template prompt with spaces and Unicode", asy
   const value = await page
     .getByRole("textbox", { name: "启动提示词预览" })
     .inputValue();
-  expect(await page.evaluate(() => (window as any).__fixture.copied)).toEqual([
-    value,
-  ]);
+  const { copied, data: { files: { prompt } } } = await page.evaluate(() => (window as any).__fixture);
+  expect(copied).toEqual([prompt]);
+  // The browser normalizes textarea line endings on Windows.
+  expect(value).toBe(prompt.replace(/\r\n/g, "\n"));
   expect(value).toContain("E:\\隔离项目\\Home Base");
   expect(value).not.toContain("{{");
   expect(value).not.toContain("endpoint.json");

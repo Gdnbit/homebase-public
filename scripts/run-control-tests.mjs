@@ -23,33 +23,73 @@ try {
   console.error("无法核对构建目录可用空间，未启动编译。请检查 CARGO_TARGET_DIR 指向的目录或所在盘。");
   process.exit(1);
 }
-// Unit fixtures allocate their data below the temporary directory. Keep
-// their scope aligned without replacing the explicit integration profile.
-const unitEnv = { ...process.env };
-if (process.env.HOMEBASE_TEST_HOME) {
-  const unitRoot = fs.mkdtempSync(path.join(os.tmpdir(), "homebase-control-unit-"));
-  Object.assign(unitEnv, { HOMEBASE_TEST_HOME: unitRoot, TMPDIR: unitRoot, TEMP: unitRoot, TMP: unitRoot });
+const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "homebase-control-"));
+const inherited = new Set([
+  "path", "pathext", "systemroot", "windir", "comspec", "systemdrive",
+  "programfiles", "programfiles(x86)", "programw6432", "programdata",
+  "number_of_processors", "processor_architecture", "os",
+  "include", "lib", "libpath", "vsinstalldir", "vcinstalldir", "vctoolsinstalldir",
+  "windowssdkdir", "windowssdkversion", "universalcrtsdkdir", "ucrtversion",
+  "cargo_net_offline", "cargo_build_jobs", "rustup_toolchain", "rustflags",
+  "rust_backtrace", "rustc", "rustc_wrapper", "rustc_workspace_wrapper", "cc", "cxx", "ar",
+]);
+const toolchain = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
+  inherited.has(name.toLowerCase()) || /^(VSCMD_|CARGO_PROFILE_|CARGO_TERM_)/i.test(name)
+));
+Object.assign(toolchain, {
+  CARGO_HOME: process.env.CARGO_HOME || path.join(os.homedir(), ".cargo"),
+  RUSTUP_HOME: process.env.RUSTUP_HOME || path.join(os.homedir(), ".rustup"),
+  CARGO_TARGET_DIR: target,
+});
+
+function isolatedProfile(name) {
+  const home = path.join(testRoot, name);
+  const roaming = path.join(home, "AppData", "Roaming");
+  const local = path.join(home, "AppData", "Local");
+  for (const directory of [roaming, local]) fs.mkdirSync(directory, { recursive: true });
+  return {
+    ...toolchain,
+    HOMEBASE_TEST_HOME: home,
+    HOME: home,
+    USERPROFILE: home,
+    APPDATA: roaming,
+    LOCALAPPDATA: local,
+    XDG_CONFIG_HOME: path.join(home, ".config"),
+    TMPDIR: home,
+    TEMP: home,
+    TMP: home,
+    ...(process.platform === "win32" ? { SystemTemp: home } : {}),
+  };
+}
+
+function run(phase, executable, args, env) {
+  const result = spawnSync(executable, args, { cwd: root, stdio: "inherit", env });
+  if (result.status === 0) return true;
+  const reason = result.error?.code || result.signal || result.status || "unknown";
+  console.error(`控制层测试阶段「${phase}」失败（${reason}）`);
+  return false;
 }
 const cargoTests = ["test", "--locked", "--manifest-path", manifest];
 const testThreads = ["--", "--test-threads=1"];
-for (const [args, env] of [
-  [[...cargoTests, "--lib", ...testThreads], unitEnv],
-  [[...cargoTests, "--test", "*", ...testThreads], process.env],
-  [["build", "--locked", "--manifest-path", manifest, "--bin", "fixture"], process.env],
-]) {
-  const result = spawnSync("cargo", args, { cwd: root, stdio: "inherit", env });
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
+const unitPassed = run(
+  "Rust 单测", "cargo", [...cargoTests, "--lib", ...testThreads], isolatedProfile("unit"),
+);
+const integrationPassed = run(
+  "Rust 集成",
+  "cargo",
+  [...cargoTests, "--test", "*", "--no-fail-fast", ...testThreads],
+  isolatedProfile("integration"),
+);
 const binary = path.join(target, "debug", `fixture${process.platform === "win32" ? ".exe" : ""}`);
-const result = spawnSync(
+const cliEnv = isolatedProfile("cli");
+const fixtureReady = run(
+  "CLI 夹具构建", "cargo", ["build", "--locked", "--manifest-path", manifest, "--bin", "fixture"], cliEnv,
+);
+const cliPassed = fixtureReady && run(
+  "CLI 端到端",
   process.execPath,
   ["--test", "scripts/test-homebase-control.mjs"],
-  {
-    cwd: root,
-    stdio: "inherit",
-    env: { ...process.env, HOMEBASE_CONTROL_FIXTURE_BIN: binary },
-  },
+  { ...cliEnv, HOMEBASE_CONTROL_FIXTURE_BIN: binary },
 );
-if (result.error) throw result.error;
-process.exitCode = result.status ?? 1;
+if (!fixtureReady) console.error("CLI 夹具未构建成功，CLI 端到端测试未运行。");
+process.exitCode = unitPassed && integrationPassed && cliPassed ? 0 : 1;

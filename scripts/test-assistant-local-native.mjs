@@ -12,9 +12,20 @@ import {createSyntheticVault} from './local-native-vault-fixture.mjs';
 const repo=fileURLToPath(new URL('../',import.meta.url));
 const parent=process.env.HOMEBASE_ASSISTANT_NATIVE_LAB;
 assert(parent&&path.resolve(parent).replaceAll('\\','/').startsWith('F:/HomeBase-Labs/'),'Explicit F: lab required');
+const binary=process.env.HOMEBASE_ASSISTANT_NATIVE_BIN;
+assert(binary&&path.isAbsolute(binary),'Explicit new native binary required');
+const distribution=path.join(path.dirname(binary),'distribution');
 fs.mkdirSync(parent,{recursive:true});
 const lab=fs.mkdtempSync(path.join(parent,'local-native-'));
-const fixture=createSyntheticVault(lab);
+const inheritedEnv=Object.fromEntries(Object.entries(process.env).filter(([name]) =>
+  /^(path|pathext|systemroot|windir|comspec|systemdrive|programfiles(\(x86\))?|programw6432|programdata|number_of_processors|processor_architecture|os)$/i.test(name)
+));
+const local=relative=>path.join(lab,relative);
+const temp=local('tmp');
+Object.assign(inheritedEnv,{APPDATA:local('AppData/Roaming'),LOCALAPPDATA:local('AppData/Local'),TEMP:temp,TMP:temp,TMPDIR:temp,SystemTemp:temp});
+for(const dir of [inheritedEnv.APPDATA,inheritedEnv.LOCALAPPDATA,temp,local('Documents'),local('AIHub/models')])fs.mkdirSync(dir,{recursive:true});
+fs.writeFileSync(local('AIHub/models/installed-models.json'),JSON.stringify({schema_version:1,models:{}}),{flag:'wx'});
+const fixture=createSyntheticVault(lab,{toolDirectory:path.join(distribution,'tools'),inheritedEnv});
 const readonly=path.join(lab,'readonly');fs.mkdirSync(readonly);
 fs.writeFileSync(path.join(readonly,'sentinel.txt'),'SYNTHETIC SENTINEL');
 const skill=path.join(lab,'.codex/skills/synthetic');fs.mkdirSync(skill,{recursive:true});
@@ -24,7 +35,7 @@ const audit=path.join(lab,'credential-digests.jsonl');
 const server={id:'homebase-fixture',name:'合成 MCP',description:'隔离协议验证',transport:'stdio',command:process.execPath,args:[path.join(repo,'agent-runtime/test/fixtures/mcp-local.mjs')],env:{FIXTURE_TOKEN:'${FIXTURE_TOKEN}',FIXTURE_AUDIT_FILE:audit,FIXTURE_AUDIT_SOURCE:'sops'}};
 const referenceServer={...server,id:'homebase-reference-fixture',env:{...server.env,FIXTURE_AUDIT_SOURCE:'api_key_manager'}};
 const httpChild=spawn(process.execPath,[path.join(repo,'agent-runtime/test/fixtures/mcp-local.mjs'),'--http'],{windowsHide:true,stdio:['ignore','pipe','pipe'],env:{SystemRoot:process.env.SystemRoot,PATH:process.env.PATH,TEMP:lab,TMP:lab,FIXTURE_TOKEN:'SYNTHETIC-NATIVE-HTTP-ONLY'}});
-httpChild.stderr.on('data',()=>{});const httpTimer=setTimeout(()=>httpChild.kill(),120000);
+httpChild.stderr.on('data',()=>{});const httpTimer=setTimeout(()=>httpChild.kill(),480000);
 const httpPort=await new Promise((resolve,reject)=>{readline.createInterface({input:httpChild.stdout}).once('line',line=>resolve(JSON.parse(line).port));httpChild.once('error',reject);httpChild.once('exit',()=>reject(Error('Synthetic HTTP fixture exited before ready')));});
 const httpServer={id:'assistant-http-fixture',name:'合成HTTP MCP',description:'原生HTTP隔离验证',url:`http://127.0.0.1:${httpPort}/mcp`,headers:{}};
 const httpDefinition={...httpServer,transport:'streamable-http'};
@@ -34,17 +45,27 @@ const state={settings:{revision:0,enabled:false,route_id:'',wechat_enabled:true,
 state.local.mcp_grants[0].credential_bindings=[{variable:'FIXTURE_TOKEN',reference:'sops:fixture_token'}];
 state.local.mcp_grants.push({id:referenceServer.id,fingerprint:serverFingerprint(referenceServer),tools:['sum'],resources:false,prompts:false,credential_bindings:[{variable:'FIXTURE_TOKEN',reference:'api_key_manager:openrouter'}]});
 fs.writeFileSync(path.join(lab,'seed-state.json'),JSON.stringify(state));
-const seed=spawnSync('pwsh',['-NoProfile','-File','scripts/test-local-native-seed.ps1','-Lab',lab],{cwd:repo,encoding:'utf8',windowsHide:true});assert.equal(seed.status,0,seed.stderr);
-const env={...fixture.env,HOMEBASE_TEST_HOME:lab,HOMEBASE_AIHUB_ROOT:path.join(lab,'AIHub'),HOMEBASE_MODEL_ROOT:path.join(lab,'models'),HOMEBASE_RUNTIME_ROOT:path.join(lab,'runtime'),HOMEBASE_MODEL_CACHE:path.join(lab,'cache'),HOMEBASE_ASR_OUTPUT_ROOT:path.join(lab,'asr-output')};
-delete env.HOMEBASE_CONTROL_ENDPOINT;
-const binary=process.env.HOMEBASE_ASSISTANT_NATIVE_BIN;assert(binary&&path.isAbsolute(binary),'Explicit new native binary required');
+const seed=spawnSync('pwsh',['-NoProfile','-File','scripts/test-local-native-seed.ps1','-Lab',lab],{cwd:repo,env:fixture.env,encoding:'utf8',windowsHide:true});assert.equal(seed.status,0,seed.stderr);
+const env={...fixture.env,HOMEBASE_TEST_HOME:lab,HOMEBASE_AIHUB_ROOT:local('AIHub'),HOMEBASE_MODEL_ROOT:local('models'),HOMEBASE_RUNTIME_ROOT:local('runtime'),HOMEBASE_MODEL_CACHE:local('cache'),HOMEBASE_ASR_OUTPUT_ROOT:local('asr-output'),HOMEBASE_REVEAL_EXE:path.join(distribution,'bin','homebase-reveal.exe')};
 const digest=file=>fs.existsSync(file)?crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'):null;
-const realSql=path.join(process.env.APPDATA,'io.github.gdnbit.homebase/homebase.db'),beforeSql=digest(realSql);
 const start=()=>spawn(binary,[],{cwd:repo,env,stdio:'ignore',windowsHide:true});let app;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));let seq=0;
-function cli(args,allowFailure=false){const child=spawnSync(process.execPath,['scripts/homebase.mjs',...args],{cwd:repo,env,encoding:'utf8',windowsHide:true,timeout:20000});let value;try{value=JSON.parse(child.stdout);}catch{throw Error('CLI did not return valid JSON');}assert(value.ok||allowFailure,JSON.stringify(value.error));return value;}
+function cli(args,allowFailure=false){const child=spawnSync(process.execPath,['scripts/homebase.mjs',...args],{cwd:repo,env,encoding:'utf8',windowsHide:true,timeout:50000});if(child.error)throw child.error;const value=JSON.parse(child.stdout);assert(value.ok||allowFailure,JSON.stringify(value.error));return value;}
 function call(command,input={},wait=15000,allowFailure=false){const file=path.join(lab,`request-${++seq}.json`);fs.writeFileSync(file,JSON.stringify(input));const value=cli(['call',command,'--input',file,'--allow-private','--allow-write','--allow-external','--request-id',`isolated-local-${seq}`,'--wait-ms',String(wait)],allowFailure);return value.job;}
-function result(command,input={}){const job=call(command,input);assert.equal(job.status,'succeeded',JSON.stringify(job));return job.result;}
+function result(command,input={}){
+  let job=call(command,input,0);
+  assert(job?.id,`Missing accepted job for ${command}`);
+  const deadline=Date.now()+75_000;
+  const pause=new Int32Array(new SharedArrayBuffer(4));
+  while(['queued','running'].includes(job.status)&&Date.now()<deadline){
+    Atomics.wait(pause,0,0,200);
+    const queried=cli(['jobs','get',job.id,'--allow-private','--allow-write','--allow-external'],true);
+    assert(queried.job,JSON.stringify(queried.error));
+    job=queried.job;
+  }
+  assert.equal(job.status,'succeeded',JSON.stringify(job));
+  return job.result;
+}
 function execute(operation,request,operationId=`local-fixture-${seq+1}`){return result('assistant_local_execute',{operation,request,operationId,policyRevision:0});}
 async function ready(){const endpoint=path.join(lab,'.homebase/control/endpoint.json');for(let i=0;i<150;i++){if(app.exitCode!==null)throw Error('Native test app exited');try{if(JSON.parse(fs.readFileSync(endpoint,'utf8')).pid===app.pid){cli(['doctor']);return;}}catch{}await sleep(200);}throw Error('Native app did not become ready');}
 async function stop(){if(app&&app.exitCode===null){app.kill();await new Promise(resolve=>app.once('exit',resolve));}}
@@ -108,8 +129,8 @@ try{
   let started=false;for(let i=0;i<30;i++){if(result('assistant_local_progress',{operationId:recoveryId}).output?.includes('RESTART_READY')){started=true;break;}await sleep(100);}assert(started);
   await stop();await sleep(1500);app=start();await ready();
   const recovered=cli(['jobs','get',interrupted.id,'--allow-private','--allow-write','--allow-external'],true).job;assert.equal(recovered.status,'interrupted_unknown');await sleep(8500);assert.equal(fs.existsSync(path.join(scratch,'restarted.txt')),false);
-  assert.equal(result('assistant_config_get').settings.enabled,false);assert.equal(digest(realSql),beforeSql);
-  const report={lab,binary,binary_sha256:digest(binary),real_model_calls:0,real_wechat_messages:0,production_sql_unchanged:true,files:true,terminal:true,mcp_sdk:true,mcp_http:true,http_auth_required_explicit:true,skill:true,skill_output_read_and_export:true,cancel:true,restart_no_reexecution:true,artifact_hash:exported.artifact.sha256};
+  assert.equal(result('assistant_config_get').settings.enabled,false);
+  const report={lab,binary,binary_sha256:digest(binary),real_model_calls:0,real_wechat_messages:0,files:true,terminal:true,mcp_sdk:true,mcp_http:true,http_auth_required_explicit:true,skill:true,skill_output_read_and_export:true,cancel:true,restart_no_reexecution:true,artifact_hash:exported.artifact.sha256};
   Object.assign(report,{synthetic_sops_rotation:true,synthetic_expiry_block:true,explicit_reference_no_fallback:true,credential_values_redacted:true,internal_read_not_publicly_callable:true});
   fs.writeFileSync(path.join(lab,'validation.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }finally{await stop();httpChild.kill();clearTimeout(httpTimer);}

@@ -475,21 +475,30 @@ mod tests {
 
     #[test]
     fn parse_obsidian_vaults_handles_real_format() {
-        let raw = r#"{"vaults":{"01b15f2dd22057a6":{"path":"C:\\HomeBase\\Wiki","ts":1776016099684,"open":true}},"cli":true}"#;
-        let v = parse_obsidian_vaults(raw).unwrap();
+        let vault = crate::legacy_isolation::wiki_root();
+        let raw = serde_json::json!({
+            "vaults": {"fixture-vault": {"path": vault, "ts": 1776016099684_u64, "open": true}},
+            "cli": true
+        });
+        let v = parse_obsidian_vaults(&raw.to_string()).unwrap();
         assert_eq!(v.len(), 1);
-        assert_eq!(v[0].id, "01b15f2dd22057a6");
-        assert_eq!(v[0].path, "C:\\HomeBase\\Wiki");
+        assert_eq!(v[0].id, "fixture-vault");
+        assert_eq!(Path::new(&v[0].path), vault.as_path());
         assert!(v[0].open);
-        assert!(v[0].matches_expected); // canonical_path 把 C:\HomeBase\Wiki 与 EXPECTED_VAULT 对比
+        assert!(v[0].matches_expected);
     }
 
     #[test]
     fn parse_obsidian_vaults_b_prime_dangling() {
-        let raw = r#"{"vaults":{"abc":{"path":"C:\\HomeBase\\Integrations\\ExampleKnowledge\\knowledge-base","open":true}}}"#;
-        let v = parse_obsidian_vaults(raw).unwrap();
+        let temp = match crate::legacy_isolation::test_path("") {
+            Some(home) => tempfile::tempdir_in(home),
+            None => tempfile::tempdir(),
+        }
+        .unwrap();
+        let fixture = temp.path().join("UnrelatedObsidian");
+        let raw = serde_json::json!({"vaults": {"fixture-other": {"path": fixture, "open": true}}});
+        let v = parse_obsidian_vaults(&raw.to_string()).unwrap();
         assert_eq!(v.len(), 1);
-        // 这个路径不等于 C:\HomeBase\Wiki → matches_expected = false
         assert!(!v[0].matches_expected);
     }
 

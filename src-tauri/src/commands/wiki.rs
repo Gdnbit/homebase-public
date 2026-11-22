@@ -591,8 +591,6 @@ mod tests {
     #[test]
     fn resolve_within_wiki_accepts_relative() {
         let p = resolve_within_wiki("wiki/notes/foo.md").unwrap();
-        let s = p.to_string_lossy();
-        assert!(s.starts_with(r"C:\HomeBase\Wiki"));
-        assert!(s.ends_with("foo.md"));
+        assert_eq!(p, crate::legacy_isolation::wiki_root().join("wiki/notes/foo.md"));
     }
 }

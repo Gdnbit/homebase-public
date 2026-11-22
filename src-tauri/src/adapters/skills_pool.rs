@@ -311,12 +311,12 @@ mod tests {
     }
 
     #[test]
-    fn list_creates_dir_when_missing() {
+    fn listing_an_absent_pool_is_empty_and_read_only() {
         let tmp = tempfile::tempdir().unwrap();
         with_test_home(&tmp, || {
             let skills = list_skills().expect("list ok");
             assert!(skills.is_empty());
-            assert!(shared_skills_root().exists());
+            assert!(!shared_skills_root().exists());
         });
     }
 

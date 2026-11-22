@@ -562,7 +562,14 @@ mod tests {
         let t = default_topology();
         assert_eq!(t.version, TOPOLOGY_VERSION);
         assert_eq!(t.source, TopologySource::Default);
-        // 至少有 C 盘（任何 Windows 机器都有）
+        if let Some(home) = crate::legacy_isolation::test_path("") {
+            let workspace = t.roots.iter().find(|root| root.id == "test-workspace").unwrap();
+            assert_eq!(Path::new(&workspace.absolute_path), home.as_path());
+            assert!(t.roots.iter().all(|root| matches!(root.id.as_str(), "manual" | "test-workspace")));
+            assert!(t.edges.is_empty());
+            return;
+        }
+        // Windows 系统盘
         assert!(
             t.roots.iter().any(|r| r.id == "drive_c"),
             "默认 topology 必须包含 C 盘节点"
@@ -579,6 +586,10 @@ mod tests {
     #[test]
     fn default_topology_has_manual_to_drive_edges_when_manual_exists() {
         let t = default_topology();
+        if crate::legacy_isolation::test_path("").is_some() {
+            assert!(t.edges.is_empty());
+            return;
+        }
         // 如果 manual（本机操作指南）存在，则必然有至少一条 manual→drive_X edge
         let has_manual = t.roots.iter().any(|r| r.id == "manual" && r.exists);
         if has_manual {
