@@ -2,7 +2,7 @@
 
 ## 当前范围与事实源
 
-能力库入口为 `/capabilities`。新增 GitHub 自动接入区提供公开仓库分析、固定发布包安装、stdin/stdout接口封装、隔离行为验收和注册；桌面与微信共用发现/调用接口。当前驱动支持单一 npm CLI，首例为 Marked 文本转换。完整边界、调用和恢复见 [GitHub 仓库能力接入](github-capability-pipeline.md)。保留固定 `hyperframes.animation` 视频适配器及原草稿区。
+能力库入口为 `/capabilities`。新增 GitHub 自动接入区提供公开仓库分析、固定发布包安装、stdin/stdout接口封装、隔离行为验收和注册；桌面与微信共用发现/调用接口。当前驱动支持单一 npm CLI，可用公开示例验证输入、输出和结果回执。完整边界、调用和恢复见 [GitHub 仓库能力接入](github-capability-pipeline.md)。保留固定 `hyperframes.animation` 视频适配器及原草稿区。
 
 草稿的唯一持久化来源是当前 HomeBase WebView 本地存储 `homebase.capabilities.drafts.v1`，格式为 `{ version: 1, entries: CapabilityDraft[] }`；不属于原生能力注册表，不供 CLI 自动执行。重进页面读取本地事实，打开编辑不产生后端查询。读取失败或损坏时禁止新增覆盖，显示错误与重试；写入失败保留表单。保存时比较打开编辑时的原始版本，发生外部修改需重新读取并核对后重试。
 
@@ -12,9 +12,9 @@
 
 新增“按功能发现 → 开发”，复用本机Agent Autoloop的可执行工作流，支持参数表单、稳定请求、任务查询、问题回答与宿主验收。它是专用适配器，不通过通用npm文本CLI安装流程。使用和边界见[开发能力](development-capability.md)。
 
-## 首个实际能力：HyperFrames
+## 公开适配器示例
 
-来源为 [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes)，Apache-2.0，固定 npm 版本 0.9.26，并核对 npm 包 integrity。项目由 AI 编写 HTML 动画、由本机 Chrome 和 FFmpeg 渲染 MP4，不是扩散模型文生视频。当前适配器使用代码内的确定性动画模板，CLI 输入标题、副标题和 2–12 秒整数时长，输出 960×540、24fps、无声 MP4；不需要 HeyGen、OpenAI 或其他服务商密钥。
+源码内的代码动画适配器可以用于验证接口；能力目录由各部署自行维护。示例实现使用 [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes)，Apache-2.0，固定 npm 版本 0.9.26，并核对 npm 包 integrity。项目由 AI 编写 HTML 动画、由本机 Chrome 和 FFmpeg 渲染 MP4，不是扩散模型文生视频。当前适配器使用代码内的确定性动画模板，CLI 输入标题、副标题和 2–12 秒整数时长，输出 960×540、24fps、无声 MP4；不需要 HeyGen、OpenAI 或其他服务商密钥。
 
 安装只接受新的空目录或带有本模块所有权标记的目录，拒绝根目录、网络共享和目录联接；不覆盖已有业务目录。npm 依赖与锁文件、缓存、临时用户目录、工具和结果均在指定目录。npm 安装禁用生命周期脚本和用户 npm 配置；运行子进程使用系统项白名单环境，不继承凭据变量。使用系统 Chrome 的可执行文件，但使用独立临时配置；关闭上游遥测和更新检查。FFmpeg 从项目自带工具复制，ffprobe 从固定 npm 包安装。
 
@@ -33,9 +33,9 @@
 
 输入不走 shell 拼接；动画内容经过 HTML 转义，仅引用本地 GSAP，页面 CSP 禁止外连。安装与渲染均有超时，超时终止本次进程树。当前没有公开取消接口；应用异常关闭后的未完成控制任务按既有协议显示 interrupted_unknown，不自动重跑。若留下目录操作锁，应先核对控制任务、渲染进程和输出，不以删除锁代替任务确认。该目录隔离与环境白名单不是操作系统安全沙箱，不应把未知项目代码放入受管理安装目录。
 
-当前交付使用源码项目中的 Node 适配器脚本，安装包内分发这些脚本及工具仍需另行纳入打包流程。实际安装与 CLI/MP4 证据见 本机验收记录。
+在源码检出中可按上述接口使用 Node 适配器。分发构建按目标环境准备脚本和工具。用合成输入核对控制任务、业务状态、MP4 属性和结果散列。 [Windows 打包](windows-packaging.md) · [隔离验证地图](verification-map.md)
 
-设计基准见 能力库设计图，包含空态、添加弹窗、待验证卡片。同一布局的读取失败、保存失败、冲突、窄屏与键盘状态由实际界面和测试补足。实施保留原侧栏与视觉令牌；输入输出与固定版本字段是后续封装所需的补充，不照搬设计图中的示例项目为真实数据。
+界面以公开演示数据展示能力分组。读取失败、保存冲突和窄屏操作应使用本仓库的合成夹具复验。 [能力库界面](screenshots/capabilities.png)
 
 ## 扩展其他运行时的路径
 

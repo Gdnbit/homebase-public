@@ -54,6 +54,7 @@ npm test --prefix agent-runtime
 cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 ```
 
+- [完整文档索引](docs/index.md) · [项目路线图](docs/ROADMAP.md)
 - [助理与微信](docs/assistant.md) · [微信绑定与使用](docs/wechat-integration.md)
 - [能力库](docs/capability-library.md) · [能力发现接口](docs/capability-discovery.md)
 - [架构](docs/architecture.md) · [维护迭代](docs/maintenance-goal.md)
