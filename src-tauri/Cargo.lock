@@ -1962,7 +1962,7 @@ dependencies = [
  "tauri-plugin-sql",
  "tauri-plugin-store",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "toml 0.8.2",
  "toml_edit 0.22.27",
