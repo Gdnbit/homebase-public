@@ -1,40 +1,63 @@
-# HomeBase
+<p align="center">
+  <img src="docs/brand/homebase-mark.png" width="104" height="104" alt="HomeBase 标识">
+</p>
 
-**Windows 上的本地 AI 助理和能力工作台。**
+<h1 align="center">HomeBase</h1>
 
-在桌面或微信里用自然语言交办任务，HomeBase 会按用途查找可用的模型、MCP、Skill 或本机能力。任务受理后可以查原进度、恢复中断的流程并取回产物。
+<p align="center"><strong>本地 AI 助理与能力工作台</strong></p>
 
-## 界面预览
+<p align="center">
+  简体中文 · <a href="README.en.md">English</a>
+</p>
 
-![HomeBase AI 助理首页](docs/screenshots/assistant.png)
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#功能">功能</a> ·
+  <a href="docs/index.md">文档</a> ·
+  <a href="CONTRIBUTING.md">参与贡献</a>
+</p>
 
-以上为合成数据界面。 [查看能力库截图](docs/screenshots/capabilities.png)
+HomeBase 把聊天、任务和本机工具放进同一个 Windows 工作台。你可以在桌面或微信交办任务，让 Pi 助理选择合适的能力，再查看执行进度、继续处理或取回文件。模型服务、MCP、Skill 和已接入的开源项目集中在「能力库」，按要做的事查找。
 
-## 主要能力
+![HomeBase 桌面助理](docs/screenshots/assistant.png)
 
-| 模块 | 可以做什么 |
+## 功能
+
+| 功能 | 使用方式 |
 | --- | --- |
-| Pi 助理 | 连续对话、上下文摘要、个人记忆、提醒和任务恢复 |
-| 微信接入 | 本人扫码绑定，聊天、交办、查询进度与接收结果 |
-| 能力库 | 按功能查看本机工具、模型服务、MCP、Skill 和已注册的仓库能力 |
-| 会话与工作台 | 查看来自桌面、微信和已接入原生 Agent 的会话与运行状态 |
-| 本机 CLI | 让其他 AI 通过命令契约发现能力、校验输入、查询原任务及结果 |
+| **Pi 助理** | 在一个对话里提问、添加资料、执行任务。助理可使用长期记忆、提醒和上下文摘要。 |
+| **微信连接** | 扫码绑定后，在微信对话中交办任务、查询进度、接收文件。 |
+| **能力库** | 按功能比较模型服务、本机工具、MCP、Skill 和开源项目。选定能力后可带着上下文交给助理。 |
+| **会话与工作台** | 查看桌面、微信及已接入 Agent 的对话，跟踪任务和已上报用量。 |
+| **资料库与密钥** | 浏览项目资料，管理加密保存的密钥及轮换、到期状态。 |
+| **本机 CLI** | 让其他 AI 发现可调用能力、校验参数、查询已有任务与产物。 |
 
-## 从源码运行
+<details>
+<summary>查看能力库</summary>
 
-准备 Windows x64、Node.js 22.19 或更新版本、Rust stable，以及 MSVC C++ Build Tools 和 Windows SDK。在仓库根目录执行以下命令。
+![HomeBase 能力库](docs/screenshots/capabilities.png)
+
+</details>
+
+## 快速开始
+
+准备 Windows x64、Node.js 22.19 或以上、Rust stable、MSVC C++ Build Tools 和 Windows SDK。按[密钥环境说明](docs/agent-keys.md)准备 SOPS 和 age。
 
 ```powershell
+git clone https://github.com/Gdnbit/homebase-public.git
+cd homebase-public
 npm ci
 npm ci --prefix agent-runtime --ignore-scripts
 npm run tauri:dev
 ```
 
-前端开发可用 `npm run dev`。浏览器中的界面预览无法调用 Tauri 原生工具。首次启动后，按需在设置里配置模型、绑定微信或开放本机工作区。完整安装包需要单独准备固定版本的运行时。 [Windows 打包](docs/windows-packaging.md)
+从 **AI 助理 → 模型设置** 启用默认模型。从 **微信连接 → 扫码绑定** 在微信使用同一套助理。可以先在「能力库」查看当前可用的工具和模型。
 
-## AI 和 CLI
+[Windows 打包指南](docs/windows-packaging.md) · [助理使用指南](docs/assistant.md) · [微信绑定指南](docs/wechat-integration.md)
 
-在桌面 **设置 → 高级集成 → AI 接管** 复制启动提示词，或运行以下命令。
+## 让其他 AI 使用 HomeBase
+
+在 **设置 → 高级集成 → AI 接管** 复制启动提示词。外部 AI 可以通过 CLI 查看完整参数和返回结构，再按原任务编号查询进度与结果。
 
 ```powershell
 .\hb.cmd bootstrap
@@ -42,25 +65,13 @@ npm run tauri:dev
 .\hb.cmd describe capability_index_query
 ```
 
-在线任务由正在运行的桌面程序处理。启动提示词和接口文档包含命令、参数、授权及任务回执说明。 [AI 操作入口](control/START.md) · [CLI 手册](docs/ai-control.md)
+[AI 操作入口](control/START.md) · [CLI 手册](docs/ai-control.md) · [接口参考](control/reference.md)
 
-## 验证与文档
+## 项目文档
 
-```powershell
-npm run build
-npm run lint
-npm run test:control:contract
-npm test --prefix agent-runtime
-cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
-```
+- [能力库与接入方式](docs/capability-library.md)
+- [架构与运行时](docs/architecture.md)
+- [测试与贡献](CONTRIBUTING.md)
+- [文档索引](docs/index.md)
 
-- [完整文档索引](docs/index.md) · [项目路线图](docs/ROADMAP.md)
-- [助理与微信](docs/assistant.md) · [微信绑定与使用](docs/wechat-integration.md)
-- [能力库](docs/capability-library.md) · [能力发现接口](docs/capability-discovery.md)
-- [架构](docs/architecture.md) · [维护迭代](docs/maintenance-goal.md)
-
-公开仓库包含源码、合成测试和接口文档。模型权重、凭据、个人配置、会话、真实产物和可执行分发包由使用者另行准备。贡献前请启用提交和推送隐私检查。 [提交流程](CONTRIBUTING.md)
-
-## 许可证
-
-HomeBase 项目自身源码和文档使用 MIT 许可证。第三方组件及其原有材料遵循各自的许可。 [MIT 许可证](LICENSE) · [第三方说明](packaging/windows/THIRD-PARTY-NOTICES.md)
+HomeBase 使用 [MIT 许可证](LICENSE)。各依赖遵循其[第三方许可](packaging/windows/THIRD-PARTY-NOTICES.md)。
