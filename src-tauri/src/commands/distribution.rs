@@ -99,6 +99,33 @@ fn resolve_file_candidate(
         .to_path_buf()
 }
 
+fn resolve_secret_tool(
+    name: &str,
+    filename: &str,
+    legacy: &str,
+    root: &Path,
+    packaged: bool,
+) -> PathBuf {
+    let selected = resolve_file_candidate(
+        None,
+        path_from_env(name).as_deref(),
+        &root.join("tools").join(filename),
+        Path::new(legacy),
+    );
+    if packaged || selected.is_file() {
+        return selected;
+    }
+    // Source builds can use locally installed tools. Avoid relative PATH entries.
+    std::env::var_os("PATH")
+        .and_then(|path| {
+            std::env::split_paths(&path)
+                .filter(|directory| directory.is_absolute())
+                .map(|directory| directory.join(filename))
+                .find(|candidate| candidate.is_file())
+        })
+        .unwrap_or(selected)
+}
+
 fn choose_user_path(legacy: &Path, fallback: &Path) -> PathBuf {
     if legacy.exists() {
         legacy.to_path_buf()
@@ -175,18 +202,24 @@ fn initialize_secrets(runtime: &DistributionRuntime) -> Result<(), String> {
         return Ok(());
     }
     if !runtime.sops_path.is_file() || !runtime.age_keygen_path.is_file() {
-        return Err("首次创建密钥库需要随包的 SOPS 和 age-keygen。".to_string());
+        return Err("创建密钥库需要 SOPS 和 age-keygen，请检查运行时或开发环境 PATH。".to_string());
     }
 
     let secrets_dir = runtime
         .secrets_path
         .parent()
         .ok_or_else(|| "密钥文件没有父目录。".to_string())?;
-    let identity_dir = secrets_dir.join(".age-keys");
-    let identity_path = identity_dir.join("primary.txt");
-    fs::create_dir_all(&identity_dir).map_err(|error| format!("创建 age 目录失败：{error}"))?;
-
+    let managed_identity = secrets_dir.join(".age-keys").join("primary.txt");
+    let identity_path = path_from_env("SOPS_AGE_KEY_FILE")
+        .or_else(|| path_from_env("HOMEBASE_SOPS_AGE_KEY_FILE"))
+        .unwrap_or_else(|| managed_identity.clone());
+    crate::legacy_isolation::ensure_test_path(&identity_path)?;
     if !identity_path.is_file() {
+        if identity_path != managed_identity {
+            return Err(format!("找不到指定的 age 身份：{}。请核对路径后重试。", identity_path.display()));
+        }
+        fs::create_dir_all(secrets_dir.join(".age-keys"))
+            .map_err(|error| format!("创建 age 目录失败：{error}"))?;
         let output = Command::new(&runtime.age_keygen_path)
             .args(["-o", identity_path.to_string_lossy().as_ref()])
             .output()
@@ -284,15 +317,18 @@ fn resolve_runtime(app: &AppHandle) -> Result<DistributionRuntime, String> {
     });
     let explicit_vault = path_from_env("HOMEBASE_SECRETS_FILE").or_else(|| path_from_env("HOMEBASE_SECRETS_YAML"));
     let custom_vault = explicit_vault.is_some();
+    let isolated_secrets = crate::legacy_isolation::test_path("Secrets/secrets.yaml");
     let secrets_path = explicit_vault.unwrap_or_else(|| {
-        if Path::new(LEGACY_SECRETS).is_file() {
+        if let Some(path) = &isolated_secrets {
+            path.clone()
+        } else if Path::new(LEGACY_SECRETS).is_file() {
             PathBuf::from(LEGACY_SECRETS)
         } else {
             data_root.join("Secrets").join("secrets.yaml")
         }
     });
     let secrets_meta_path = path_from_env("HOMEBASE_SECRETS_META").unwrap_or_else(|| {
-        if custom_vault {
+        if custom_vault || isolated_secrets.is_some() {
             secrets_path.with_file_name("secrets-meta.json")
         } else if Path::new(LEGACY_SECRETS_META).is_file() {
             PathBuf::from(LEGACY_SECRETS_META)
@@ -301,6 +337,8 @@ fn resolve_runtime(app: &AppHandle) -> Result<DistributionRuntime, String> {
         }
     });
 
+    crate::legacy_isolation::ensure_test_path(&secrets_path)?;
+    crate::legacy_isolation::ensure_test_path(&secrets_meta_path)?;
     Ok(DistributionRuntime {
         packaged,
         python_path: resolve_file_candidate(
@@ -315,17 +353,11 @@ fn resolve_runtime(app: &AppHandle) -> Result<DistributionRuntime, String> {
             &resource_root.join("tools").join("ffmpeg.exe"),
             Path::new(LEGACY_FFMPEG),
         ),
-        sops_path: resolve_file_candidate(
-            None,
-            path_from_env("HOMEBASE_SOPS_EXE").as_deref(),
-            &resource_root.join("tools").join("sops.exe"),
-            Path::new(LEGACY_SOPS),
+        sops_path: resolve_secret_tool(
+            "HOMEBASE_SOPS_EXE", "sops.exe", LEGACY_SOPS, &resource_root, packaged,
         ),
-        age_keygen_path: resolve_file_candidate(
-            None,
-            path_from_env("HOMEBASE_AGE_KEYGEN").as_deref(),
-            &resource_root.join("tools").join("age-keygen.exe"),
-            Path::new(LEGACY_AGE_KEYGEN),
+        age_keygen_path: resolve_secret_tool(
+            "HOMEBASE_AGE_KEYGEN", "age-keygen.exe", LEGACY_AGE_KEYGEN, &resource_root, packaged,
         ),
         reveal_path: crate::reveal_runtime::current()
             .map_err(|error| format!("无法定位密钥助手：{error}"))?,
@@ -385,7 +417,22 @@ pub fn bootstrap(app: &AppHandle) -> Result<DistributionRuntime, String> {
         }
     }
 
+    // Publish the resolved paths before initialization so preflight can diagnose the same runtime.
+    set_resolved_tool_environment("HOMEBASE_REVEAL_EXE", &runtime.reveal_path);
+    set_resolved_tool_environment("HOMEBASE_SOPS_EXE", &runtime.sops_path);
+    set_resolved_tool_environment("HOMEBASE_AGE_KEYGEN", &runtime.age_keygen_path);
+    set_default_environment("HOMEBASE_SECRETS_FILE", &runtime.secrets_path);
+    set_default_environment("HOMEBASE_SECRETS_YAML", &runtime.secrets_path);
+    set_default_environment("HOMEBASE_SECRETS_META", &runtime.secrets_meta_path);
     initialize_secrets(&runtime)?;
+
+    let identity = path_from_env("HOMEBASE_SOPS_AGE_KEY_FILE").unwrap_or_else(|| {
+        runtime.secrets_path.with_file_name(".age-keys").join("primary.txt")
+    });
+    if identity.is_file() {
+        set_default_environment("HOMEBASE_SOPS_AGE_KEY_FILE", &identity);
+        set_default_environment("SOPS_AGE_KEY_FILE", &identity);
+    }
     if let Some(parent) = runtime.secrets_meta_path.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建密钥元数据目录失败：{error}"))?;
     }
@@ -407,30 +454,6 @@ pub fn bootstrap(app: &AppHandle) -> Result<DistributionRuntime, String> {
     set_default_environment("HOMEBASE_ASR_OUTPUT_ROOT", &runtime.output_root);
     set_default_environment("HOMEBASE_MODEL_CACHE", &runtime.cache_root);
     set_resolved_tool_environment("HOMEBASE_FFMPEG", &runtime.ffmpeg_path);
-    set_resolved_tool_environment("HOMEBASE_REVEAL_EXE", &runtime.reveal_path);
-    set_resolved_tool_environment("HOMEBASE_SOPS_EXE", &runtime.sops_path);
-    set_resolved_tool_environment("HOMEBASE_AGE_KEYGEN", &runtime.age_keygen_path);
-    set_default_environment("HOMEBASE_SECRETS_FILE", &runtime.secrets_path);
-    set_default_environment("HOMEBASE_SECRETS_YAML", &runtime.secrets_path);
-    set_default_environment("HOMEBASE_SECRETS_META", &runtime.secrets_meta_path);
-    set_default_environment(
-        "HOMEBASE_SOPS_AGE_KEY_FILE",
-        &runtime
-            .secrets_path
-            .parent()
-            .unwrap_or(&runtime.data_root)
-            .join(".age-keys")
-            .join("primary.txt"),
-    );
-    set_default_environment(
-        "SOPS_AGE_KEY_FILE",
-        &runtime
-            .secrets_path
-            .parent()
-            .unwrap_or(&runtime.data_root)
-            .join(".age-keys")
-            .join("primary.txt"),
-    );
     set_default_environment(
         "HOMEBASE_FASTER_WHISPER_MODEL",
         &runtime

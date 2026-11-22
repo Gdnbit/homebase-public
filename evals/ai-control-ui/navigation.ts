@@ -13,12 +13,10 @@ export async function navigate(page: Page, label: string) {
     "投料口": ["已有投料记录", "已有工作入口"],
     "系统": ["本机环境"], "治理追溯": ["操作记录"],
   };
-  const target = page.getByRole("link", {name: legacy[label] ? "设置" : current[label] ?? label, exact: true});
-  if (!await target.isVisible()) {
-    const details = page.locator("details").filter({has:page.getByText("更多功能", {exact:true})});
-    if (await details.count() && await details.getAttribute("open") === null)
-      await details.locator("summary").click();
-  }
+  const target = page.getByRole("complementary").getByRole("link", {
+    name: legacy[label] ? "设置" : current[label] ?? label,
+    exact: true,
+  });
   await target.click();
   if (legacy[label]) await expect(page.getByRole("heading",{name:"设置",level:1,exact:true})).toBeVisible();
   if (legacy[label]) {
@@ -27,7 +25,7 @@ export async function navigate(page: Page, label: string) {
       const details = page.locator("details").filter({has:page.getByText(section, {exact:true})});
       if (await details.getAttribute("open") === null) await details.locator("summary").click();
     }
-    await page.getByRole("link", {name, exact:!!section}).click();
+    await page.getByRole("main").getByRole("link", { name, exact: !!section }).click();
   }
   const headings:Record<string,string>={"概览":"工作台","工作台":"工作台","AI 代理":"AI 代理","Agent 管理":"AI 代理","知识库":"知识库","资料库":"知识库","密钥":"密钥","密钥与连接":"密钥","能力库":"能力库","历史对话":"历史对话","文章生成":"文章生成","投料口":"投料口","系统":"系统","治理追溯":"治理与追溯","设置":"设置"};
   if(headings[label])await expect(page.getByRole("heading",{name:headings[label],level:1,exact:true})).toBeVisible();

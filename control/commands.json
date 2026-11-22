@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "protocol_version": 1,
-  "catalog_hash": "871f8eee88b017d625eb865ec3e31c84abfeb131d325c78ca347cbbea5bd6dc6",
+  "catalog_hash": "7be5ba49a6ad1fec742bc244e1069b0bf26b98aaa300f361fcbd8330f546899e",
   "$defs": {
     "commands__agent_versions__AgentVersionInfo__output": {
       "type": "object",
@@ -13670,7 +13670,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 1582,
+      "line": 1613,
       "description": "agents_get_endpoint",
       "output_type": "Result<AgentEndpointInfo, String>",
       "input_schema": {
@@ -13726,7 +13726,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 588,
+      "line": 595,
       "description": "agents_get_model",
       "output_type": "Result<AgentModelInfo, String>",
       "input_schema": {
@@ -13941,7 +13941,7 @@
       "reason": null,
       "parameters": [],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 287,
+      "line": 289,
       "description": "列出 5 个内置 agent + 静态元数据 + 配置文件存在性",
       "output_type": "Result<Vec<AgentInfo>, String>",
       "input_schema": {
@@ -13994,7 +13994,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 437,
+      "line": 444,
       "description": "agents_open_config",
       "output_type": "Result<(), String>",
       "input_schema": {
@@ -14060,7 +14060,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 1644,
+      "line": 1675,
       "description": "agents_set_endpoint",
       "output_type": "Result<AgentEndpointInfo, String>",
       "input_schema": {
@@ -14133,7 +14133,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 625,
+      "line": 632,
       "description": "agents_set_model",
       "output_type": "Result<AgentModelInfo, String>",
       "input_schema": {
@@ -14197,7 +14197,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 381,
+      "line": 383,
       "description": "agents_start",
       "output_type": "Result<(), String>",
       "input_schema": {
@@ -14253,7 +14253,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 326,
+      "line": 328,
       "description": "agents_status",
       "output_type": "Result<AgentStatus, String>",
       "input_schema": {
@@ -14318,7 +14318,7 @@
         }
       ],
       "source": "src-tauri/src/commands/agents.rs",
-      "line": 1694,
+      "line": 1725,
       "description": "agents_test_endpoint",
       "output_type": "Result<EndpointTestResult, String>",
       "input_schema": {
@@ -23058,7 +23058,7 @@
       "reason": null,
       "parameters": [],
       "source": "src-tauri/src/commands/distribution.rs",
-      "line": 593,
+      "line": 616,
       "description": "distribution_info",
       "output_type": "Result<DistributionInfo, String>",
       "input_schema": {
@@ -30389,7 +30389,7 @@
       "reason": null,
       "parameters": [],
       "source": "src-tauri/src/commands/system.rs",
-      "line": 876,
+      "line": 886,
       "description": "列出 User + Machine 两级 PATH 项目，逐项做死链检测",
       "output_type": "Result<Vec<PathEntry>, String>",
       "input_schema": {
@@ -30431,7 +30431,7 @@
       "reason": null,
       "parameters": [],
       "source": "src-tauri/src/commands/system.rs",
-      "line": 830,
+      "line": 840,
       "description": "启动自检 · 返回 5 项状态（不 short-circuit，每项独立返回）\n\n前端在 App 启动时调一次，把失败项渲染成顶部横幅。\n本命令不抛错（永远返回 Ok），让前端根据 `ok` + `severity` 自行分类展示。",
       "output_type": "Result<Vec<PreflightCheck>, String>",
       "input_schema": {
@@ -30475,7 +30475,7 @@
       "reason": null,
       "parameters": [],
       "source": "src-tauri/src/commands/system.rs",
-      "line": 971,
+      "line": 981,
       "description": "列出当前在跑的关键进程（HomeBase 自身 / 5 agent / sops）",
       "output_type": "Result<Vec<ProcessInfo>, String>",
       "input_schema": {

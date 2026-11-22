@@ -270,16 +270,27 @@ test("approved screens fit desktop widths and produce implementation screenshots
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 950 });
+  const navigation = page.getByRole("navigation", { name: "主导航" });
+  const entries = navigation.locator(":scope > ul > li > a");
+  const menu = () => entries.evaluateAll((links) => links.map((link) => ({
+    label: link.getAttribute("aria-label"),
+    top: link.getBoundingClientRect().top,
+  })));
+  await expect(entries).toHaveCount(8);
+  const initialMenu = await menu();
   for (const [label, file] of [
     ["AI 助理", "assistant"],
     ["会话", "conversations"],
     ["能力库", "capabilities"],
     ["工作台", "workbench"],
   ]) {
-    await page.getByRole("link", { name: label, exact: true }).click();
+    await navigation.getByRole("link", { name: label, exact: true }).click();
     await expect(
       page.getByRole("heading", { name: label, exact: true }),
     ).toBeVisible();
+    await expect(navigation.getByRole("link", { name: "新对话", exact: true })).toBeVisible();
+    await expect(navigation.getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
+    expect(await menu()).toEqual(initialMenu);
     await page.evaluate(async () => {
       await document.fonts.ready;
       await new Promise<void>((resolve) =>

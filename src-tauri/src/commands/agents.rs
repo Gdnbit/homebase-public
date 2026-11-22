@@ -43,7 +43,9 @@ fn homebase_reveal_exe_path() -> Result<PathBuf, String> {
 
 /// 拿到 ~/.homebase/ 目录路径（必要时自动创建）
 fn homebase_dir() -> Result<PathBuf, String> {
-    let dir = PathBuf::from(env_home()).join(".homebase");
+    let dir = crate::legacy_isolation::test_path(".homebase")
+        .unwrap_or_else(|| PathBuf::from(env_home()).join(".homebase"));
+    crate::legacy_isolation::ensure_test_path(&dir)?;
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| format!("创建 {} 失败: {e}", dir.display()))?;
     }
@@ -397,8 +399,13 @@ pub async fn agents_start(id: String) -> Result<(), String> {
     // - Win agent: powershell -Command "agent-env <subcommand>"
     let ps_command = if let Some(distro) = meta.wsl_distro {
         format!("wsl -d {distro} -- bash -lc '{subcommand}'")
+    } else if Path::new(AGENT_ENV_PS1_PATH).is_file() {
+        format!("& '{AGENT_ENV_PS1_PATH}' {subcommand}")
     } else {
-        format!("& 'C:\\HomeBase\\Tools\\bin\\agent-env.ps1' {subcommand}")
+        if requires_agent_wrapper(Some(meta.id))? {
+            return Err("此 Agent 的自定义密钥或端点依赖 agent-env.ps1。请恢复包装脚本，或在该 Agent 中配置登录后清除包装器绑定。".into());
+        }
+        format!("& '{subcommand}'")
     };
 
     let mut cmd = std::process::Command::new("cmd");
@@ -1168,6 +1175,30 @@ struct SimpleEndpointEntry {
 fn agent_endpoints_json_path() -> Result<PathBuf, String> {
     let dir = homebase_dir()?;
     Ok(dir.join("agent-endpoints.json"))
+}
+
+pub(super) const AGENT_ENV_PS1_PATH: &str = r"C:\HomeBase\Tools\bin\agent-env.ps1";
+
+pub(super) fn requires_agent_wrapper(agent_id: Option<&str>) -> Result<bool, String> {
+    let supported = ["gemini-cli", "openclaw"];
+    if agent_id.is_some_and(|id| !supported.contains(&id)) {
+        return Ok(false);
+    }
+    let path = agent_endpoints_json_path()?;
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(format!("读取 Agent 端点设置失败：{error}")),
+    };
+    let endpoints: std::collections::HashMap<String, SimpleEndpointEntry> =
+        serde_json::from_str(strip_bom(&raw)).map_err(|error| format!("Agent 端点设置无效：{error}"))?;
+    Ok(supported.iter().any(|id| {
+        agent_id.map_or(true, |requested| requested == *id)
+            && endpoints.get(*id).is_some_and(|entry| {
+                entry.secret_short_name.as_deref().is_some_and(|value| !value.trim().is_empty())
+                    || entry.base_url.as_deref().is_some_and(|value| !value.trim().is_empty())
+            })
+    }))
 }
 
 /// 从 ~/.homebase/agent-endpoints.json 读单个 agent endpoint

@@ -8,7 +8,8 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date("2026-11-08T12:00:00Z") });
   await page.goto("/evals/ai-control-ui/preflight.html");
   await page.clock.runFor(500);
-  await expect(page.getByText("合成启动超时", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("密钥环境检查未通过");
+  await expect(page.getByText("合成启动超时", { exact: true })).toBeHidden();
 });
 test("transient startup failures automatically recover and clear the warning", async ({
   page,
@@ -45,7 +46,13 @@ test("missing or malformed tools are not repeatedly retried", async ({
     check.hint = "合成文件缺失";
   });
   await page.getByRole("button", { name: "重新检查", exact: true }).click();
+  const details = page.getByRole("button", { name: "查看详情", exact: true });
+  await expect(details).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByText("合成文件缺失", { exact: true })).toBeHidden();
+  await details.press("Enter");
   await expect(page.getByText("合成文件缺失", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "收起详情", exact: true }).press("Enter");
+  await expect(page.getByText("合成文件缺失", { exact: true })).toBeHidden();
   await page.clock.runFor(180000);
   expect(await page.evaluate(() => (window as any).__fixture.calls)).toBe(2);
 });

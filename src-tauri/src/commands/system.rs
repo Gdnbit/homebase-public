@@ -15,7 +15,7 @@ const BYTES_PER_GB: f64 = 1_073_741_824.0; // 1024^3
 /// Phase G-8 · 启动自检目标路径（与 secrets.rs / agents.rs 保持一致）
 const SOPS_EXE_PATH: &str = r"C:\HomeBase\Tools\sops\bin\sops.exe";
 const SECRETS_YAML_PATH: &str = r"C:\HomeBase\Secrets\secrets.yaml";
-const AGENT_ENV_PS1_PATH: &str = r"C:\HomeBase\Tools\bin\agent-env.ps1";
+use super::agents::{requires_agent_wrapper, AGENT_ENV_PS1_PATH};
 
 /// 警告阈值：剩余 < 10 GB 或 使用率 > 85% 时标 warning
 const FREE_WARN_GB: f64 = 10.0;
@@ -602,7 +602,7 @@ struct GpuRaw {
 // 2. secrets_yaml  C:\HomeBase\Secrets\secrets.yaml 存在                   (critical)
 // 3. age_key       SOPS_AGE_KEY_FILE / SOPS_AGE_KEY / 默认路径可用 (critical)
 // 4. reveal_exe    HomeBase 能定位到实际使用的密钥助手           (critical)
-// 5. agent_env     C:\HomeBase\Tools\bin\agent-env.ps1 存在                  (warning, 仅 wrapper agent 用)
+// 5. agent_env     只在已保存的 Agent 端点依赖包装器时检查缺失 (warning)
 // =====================================================================
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -698,7 +698,7 @@ fn check_secrets_yaml() -> PreflightCheck {
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| SECRETS_YAML_PATH.to_string());
     let p = Path::new(&configured);
-    if p.exists() {
+    if p.is_file() {
         let size = std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
         PreflightCheck::ok(
             "secrets_yaml",
@@ -718,21 +718,32 @@ fn check_secrets_yaml() -> PreflightCheck {
 
 /// 3. age 私钥可用（SOPS_AGE_KEY_FILE / SOPS_AGE_KEY / 默认位置）
 fn check_age_key() -> PreflightCheck {
-    if let Ok(file_path) = std::env::var("SOPS_AGE_KEY_FILE") {
+    if let Some((name, file_path)) = ["SOPS_AGE_KEY_FILE", "HOMEBASE_SOPS_AGE_KEY_FILE"]
+        .into_iter()
+        .find_map(|name| {
+            std::env::var(name)
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| (name, value))
+        })
+    {
         let p = Path::new(&file_path);
-        if p.exists() {
+        if let Err(error) = crate::legacy_isolation::ensure_test_path(p) {
+            return PreflightCheck::fail("age_key", "age 私钥", "critical", error);
+        }
+        if p.is_file() {
             return PreflightCheck::ok(
                 "age_key",
                 "age 私钥",
                 "critical",
-                Some(format!("SOPS_AGE_KEY_FILE={file_path}")),
+                Some(format!("{name}={file_path}")),
             );
         }
         return PreflightCheck::fail(
             "age_key",
             "age 私钥",
             "critical",
-            format!("SOPS_AGE_KEY_FILE 指向的文件不存在：{file_path}"),
+            format!("{name} 指向的文件不存在：{file_path}"),
         );
     }
     if let Ok(key) = std::env::var("SOPS_AGE_KEY") {
@@ -745,18 +756,20 @@ fn check_age_key() -> PreflightCheck {
             );
         }
     }
-    if let Ok(appdata) = std::env::var("APPDATA") {
-        let default = PathBuf::from(appdata)
-            .join("sops")
-            .join("age")
-            .join("keys.txt");
-        if default.exists() {
-            return PreflightCheck::ok(
-                "age_key",
-                "age 私钥",
-                "critical",
-                Some(default.to_string_lossy().into_owned()),
-            );
+    if std::env::var_os("HOMEBASE_TEST_HOME").is_none() {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            let default = PathBuf::from(appdata)
+                .join("sops")
+                .join("age")
+                .join("keys.txt");
+            if default.is_file() {
+                return PreflightCheck::ok(
+                    "age_key",
+                    "age 私钥",
+                    "critical",
+                    Some(default.to_string_lossy().into_owned()),
+                );
+            }
         }
     }
     PreflightCheck::fail(
@@ -803,22 +816,19 @@ fn check_reveal_exe() -> PreflightCheck {
 /// 5. agent-env.ps1 存在（Gemini/OpenClaw/Hermes 的 wrapper exec 用）
 fn check_agent_env_ps1() -> PreflightCheck {
     let p = Path::new(AGENT_ENV_PS1_PATH);
-    if p.exists() {
-        PreflightCheck::ok(
+    let label = "Agent 启动包装脚本";
+    if p.is_file() {
+        return PreflightCheck::ok("agent_env", label, "warning", Some(AGENT_ENV_PS1_PATH.into()));
+    }
+    match requires_agent_wrapper(None) {
+        Ok(false) => PreflightCheck::ok("agent_env", label, "warning", Some("当前配置无需包装脚本".into())),
+        Ok(true) => PreflightCheck::fail(
             "agent_env",
-            "agent-env.ps1 wrapper",
+            label,
             "warning",
-            Some(AGENT_ENV_PS1_PATH.into()),
-        )
-    } else {
-        PreflightCheck::fail(
-            "agent_env",
-            "agent-env.ps1 wrapper",
-            "warning",
-            format!(
-                "{AGENT_ENV_PS1_PATH} 不存在 — Gemini CLI / OpenClaw / Hermes 的 SOPS 注入将不可用（Claude Code / Codex 不受影响）"
-            ),
-        )
+            "已保存的 Gemini CLI 或 OpenClaw 密钥引用或端点需要 agent-env.ps1。请恢复脚本或调整该 Agent 的配置。".into(),
+        ),
+        Err(error) => PreflightCheck::fail("agent_env", label, "warning", error),
     }
 }
 

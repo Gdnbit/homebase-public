@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ShieldAlert,
   CheckCircle2,
+  ChevronDown,
   RefreshCw,
 } from "lucide-react";
 import { systemApi, type PreflightCheck } from "@/lib/tauri-api";
@@ -21,6 +22,8 @@ import { cn } from "@/lib/utils";
  */
 export function PreflightBanner() {
   const [automaticRetries, setAutomaticRetries] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsId = useId();
   const {
     data,
     isLoading,
@@ -117,17 +120,29 @@ export function PreflightBanner() {
       role="alert"
       aria-busy={isFetching}
       className={cn(
-        "mb-6 overflow-hidden rounded-xl border",
+        "mb-3 shrink-0 rounded-lg border",
         tone === "critical"
           ? "border-destructive/30 bg-destructive/5"
           : "border-warning/30 bg-warning/5",
       )}
     >
-      <div className="flex items-center justify-between gap-4 pr-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 px-4 py-2">
         <BannerHeader tone={tone} failedCount={failed.length} />
-        {retryButton}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-controls={detailsId}
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground hover:bg-secondary focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {detailsOpen ? "收起详情" : "查看详情"}
+            <ChevronDown className={cn("h-3.5 w-3.5", detailsOpen && "rotate-180")} aria-hidden />
+          </button>
+          {retryButton}
+        </div>
       </div>
-      <ul className="divide-y divide-border/50">
+      <ul id={detailsId} hidden={!detailsOpen} className="max-h-[35vh] divide-y divide-border/50 overflow-y-auto border-t border-border/50">
         {failed.map((c) => (
           <PreflightItem key={c.id} check={c} />
         ))}
@@ -149,20 +164,20 @@ function BannerHeader({
     tone === "critical" ? "密钥环境检查未通过" : "部分可选组件检查未通过";
   const subtitle =
     tone === "critical"
-      ? `${failedCount} 项检查未通过，相关密钥功能可能受影响，请查看下方原因并重新检查。`
-      : `${failedCount} 项可选检查未通过，相关功能可能受影响，请查看下方原因。`;
+      ? `${failedCount} 项检查未通过`
+      : `${failedCount} 项可选检查未通过`;
 
   return (
     <header
       className={cn(
-        "flex items-center gap-3 px-5 py-3",
+        "flex min-w-0 items-center gap-2 py-1",
         tone === "critical" ? "text-destructive-strong" : "text-warning-strong",
       )}
     >
       <Icon className="h-5 w-5 shrink-0" aria-hidden />
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <p className="font-serif text-sm font-semibold">{title}</p>
-        <p className="mt-0.5 text-xs opacity-80">{subtitle}</p>
+        <p className="text-xs opacity-80">{subtitle}</p>
       </div>
     </header>
   );
@@ -196,11 +211,11 @@ function PreflightItem({ check }: { check: PreflightCheck }) {
                 : "bg-warning/10 text-warning-strong",
             )}
           >
-            {check.severity}
+            {isCritical ? "必需" : "可选"}
           </span>
         </div>
         {check.hint && (
-          <p className="mt-1 break-words text-xs text-muted-foreground">
+          <p className="mt-1 break-all text-xs text-muted-foreground">
             {check.hint}
           </p>
         )}

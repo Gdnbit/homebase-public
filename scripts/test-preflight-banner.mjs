@@ -30,11 +30,11 @@ const result = await build({
         build.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => ({
           contents:
             path === "react"
-              ? "export function useEffect() {} export function useState(initial) { return [initial, () => {}]; }"
+              ? "export function useEffect() {} export function useId() { return 'fixture-preflight-details'; } export function useState(initial) { return [initial, () => {}]; }"
               : path === "@tanstack/react-query"
                 ? "export function useQuery(options) { globalThis.options = options; return globalThis.query; }"
                 : path === "lucide-react"
-                  ? "export const AlertTriangle = () => null, ShieldAlert = () => null, CheckCircle2 = () => null, RefreshCw = () => null;"
+                  ? "export const AlertTriangle = () => null, ShieldAlert = () => null, CheckCircle2 = () => null, ChevronDown = () => null, RefreshCw = () => null;"
                   : path.endsWith("utils")
                     ? "export const cn = (...parts) => parts.filter(Boolean).join(' ');"
                     : "export const systemApi = { preflight: () => [] };",
@@ -82,6 +82,8 @@ html = render({
 });
 assert.match(html, /2 项检查未通过/);
 assert.doesNotMatch(html, /2 项 critical|密钥管理会失效/);
+assert.match(html, /查看详情/);
+assert.match(html, /hidden=""/);
 assert.match(html, /检查失败/);
 html = render({ data: [check("agent_env", "warning")] });
 assert.match(html, /部分可选组件检查未通过/);
@@ -96,7 +98,7 @@ render({ data: [check("sops_exe", "critical")] });
 const tree = PreflightBanner();
 function findButton(element) {
   if (!element || typeof element !== "object") return;
-  if (element.type === "button") return element;
+  if (element.type === "button" && [element.props?.children].flat().includes("重新检查")) return element;
   for (const child of [element.props?.children].flat(Infinity)) {
     const found = findButton(child);
     if (found) return found;
